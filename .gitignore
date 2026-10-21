@@ -1,0 +1,18 @@
+# MRI source data and exports can contain identifiable information.
+/data/
+/derivatives/
+/logs/
+/output/
+*.dcm
+*.nii
+*.nii.gz
+
+# Generated packages, environments, and Python build output.
+/build/
+/dist/
+/NeuroFlowDICOMSorter.spec
+/neuroflow.egg-info/
+/UNKNOWN.egg-info/
+__pycache__/
+*.py[cod]
+.DS_Store

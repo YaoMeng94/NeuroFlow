@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}NeuroFlow{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css?v=4">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a href="/" class="brand">Neuro<span>Flow</span></a>
+      <nav aria-label="Main navigation">
+        <a href="/" {% if request.url.path == '/' %}aria-current="page"{% endif %}>New job</a>
+        <a href="/jobs" {% if request.url.path.startswith('/jobs') %}aria-current="page"{% endif %}>Jobs</a>
+        <a href="/sort" {% if request.url.path.startswith('/sort') %}aria-current="page"{% endif %}>DICOM sorter</a>
+        <a href="/inventory" {% if request.url.path == '/inventory' %}aria-current="page"{% endif %}>Series inventory</a>
+      </nav>
+    </div>
+  </header>
+  <main class="content">{% block content %}{% endblock %}</main>
+</body>
+</html>

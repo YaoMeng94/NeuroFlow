@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}New job | NeuroFlow{% endblock %}
+{% block content %}
+<div class="page-heading"><h1>New job</h1><a class="text-link" href="/jobs">View all jobs &rarr;</a></div>
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+<form action="/plan" method="post" class="job-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="form-section">
+    <div class="section-heading"><span class="step">01</span><h2>Dataset and stages</h2></div>
+    <div class="fields">
+      <label>Workflow<select id="workflow" name="workflow" required>
+        {% for code, label in [('anat','Anatomy'),('bold','Multi-echo BOLD'),('dwi','Diffusion'),('dicom','DICOM to BIDS')] %}
+        <option value="{{ code }}" {% if values and values.get('workflow') == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select></label>
+      <label id="participant-field">Subject label<input name="participant" type="text" required placeholder="001" value="{{ values.get('participant','') if values else '' }}"></label>
+      <label class="wide">Input directory<input name="input_dir" type="text" required placeholder="/data/project/BIDS or /data/project/DICOM" value="{{ values.get('input_dir','') if values else '' }}"></label>
+      <label class="wide">Output directory<input name="output_dir" type="text" required placeholder="/data/project/derivatives or /data/project/BIDS" value="{{ values.get('output_dir','') if values else '' }}"></label>
+      <label>Session label <small>Optional</small><input name="session" type="text" placeholder="01" value="{{ values.get('session','') if values else '' }}"></label>
+      <fieldset class="stage-field wide"><legend>Stages</legend><div id="stage-options" class="stage-options"></div></fieldset>
+    </div>
+  </section>
+
+  <section class="form-section" id="dicom-settings">
+    <div class="section-heading"><span class="step">02</span><h2>DICOM conversion</h2></div>
+    <div class="fields"><label class="wide">dcm2bids configuration JSON<input name="dicom_config" type="text" placeholder="/data/project/code/dcm2bids_config.json" value="{{ values.get('dicom_config','') if values else '' }}"></label></div>
+  </section>
+
+  <section class="form-section" id="processing-settings">
+    <div class="section-heading"><span class="step">02</span><h2>Resources and paths</h2></div>
+    <div class="fields">
+      <label>Processes<input name="nprocs" type="number" min="1" max="50" value="{{ values.get('nprocs','16') if values else '16' }}"></label>
+      <label id="omp-field">OpenMP threads<input name="omp_nthreads" type="number" min="1" max="50" value="{{ values.get('omp_nthreads','8') if values else '8' }}"></label>
+      <label id="memory-field">Memory (MiB)<input name="mem_mb" type="number" min="1024" step="1024" value="{{ values.get('mem_mb','32768') if values else '32768' }}"></label>
+      {% if site.nextflow %}<label>Execution engine<select name="execution_engine"><option value="native" {% if not values or values.get('execution_engine','native') == 'native' %}selected{% endif %}>Native</option><option value="nextflow" {% if values and values.get('execution_engine') == 'nextflow' %}selected{% endif %}>Nextflow</option></select></label>
+      <label class="choice"><input name="nextflow_resume" type="checkbox" {% if values and values.get('nextflow_resume') %}checked{% endif %}><span>Resume completed Nextflow task</span></label>
+      <p class="field-note wide">Nextflow tracks and resumes the selected complete modality workflow as one local task. Its internal stages are not independently cached. Keep the hidden Nextflow work directory while using derivative symlinks.</p>{% endif %}
+      <label class="wide">Work directory <small>Optional</small><input name="work_dir" type="text" value="{{ values.get('work_dir','') if values else '' }}"></label>
+      <label class="wide">BIDS filter JSON <small>Optional</small><input name="bids_filter_file" type="text" value="{{ values.get('bids_filter_file','') if values else '' }}"></label>
+      <label class="choice wide" id="skip-validation-field"><input name="skip_bids_validation" type="checkbox" {% if values and values.get('skip_bids_validation') %}checked{% endif %}><span>Skip BIDS validation</span></label>
+    </div>
+  </section>
+
+  <section class="form-section" id="anat-settings">
+    <div class="section-heading"><span class="step">03</span><h2>Anatomy</h2></div>
+    <div class="fields">
+      <label>MSM threads per hemisphere<input name="msm_threads" type="number" min="1" max="25" value="{{ values.get('msm_threads','4') if values else '4' }}"></label>
+      <label class="wide">MSM configuration <small>Optional</small><input name="msm_config" type="text" value="{{ values.get('msm_config','') if values else '' }}"></label>
+    </div>
+  </section>
+
+  <section class="form-section" id="bold-settings">
+    <div class="section-heading"><span class="step">03</span><h2>Multi-echo BOLD</h2></div>
+    <div class="fields">
+      <label class="wide">fMRIPrep-compatible FreeSurfer subjects <small>Optional; leave blank to skip surface reconstruction in fMRIPrep</small><input name="fs_subjects_dir" type="text" value="{{ values.get('fs_subjects_dir','') if values else '' }}"></label>
+      <label class="wide">Anatomy fsLR derivatives <small>Optional</small><input name="anat_fslr_dir" type="text" value="{{ values.get('anat_fslr_dir','') if values else '' }}"></label>
+      <label class="wide">Anatomy FreeSurfer subjects <small>Optional; defaults to derivatives/freesurfer/subjects beside anatprep; used for native surface projection only</small><input name="anat_fs_subjects_dir" type="text" value="{{ values.get('anat_fs_subjects_dir','') if values else '' }}"></label>
+      <label class="wide">fMRIPrep derivatives <small>Optional override</small><input name="fmriprep_dir" type="text" value="{{ values.get('fmriprep_dir','') if values else '' }}"></label>
+      <label class="wide">tedana derivatives <small>Optional override</small><input name="tedana_dir" type="text" value="{{ values.get('tedana_dir','') if values else '' }}"></label>
+      <label class="wide">Final BOLD derivatives <small>Optional override</small><input name="mefmriprep_dir" type="text" value="{{ values.get('mefmriprep_dir','') if values else '' }}"></label>
+      <label>FD threshold (mm)<input name="fd_threshold" type="number" min="0" max="5" step="0.01" value="{{ values.get('fd_threshold','0.2') if values else '0.2' }}"></label>
+      <label>Smoothing FWHM (mm)<input name="smoothing_fwhm" type="number" min="0" max="20" step="0.1" value="{{ values.get('smoothing_fwhm','2.0') if values else '2.0' }}"></label>
+      <label>tedana signal fit<select name="tedana_fittype">{% for option in ['loglin','curvefit'] %}<option value="{{ option }}" {% if values and values.get('tedana_fittype') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>tedana PCA method<input name="tedpca" type="text" value="{{ values.get('tedpca','aic') if values else 'aic' }}"></label>
+      <label>ICA method<select name="ica_method">{% for option in ['fastica','robustica'] %}<option value="{{ option }}" {% if values and values.get('ica_method') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Comparison echo <small>0 = closest TE</small><input name="comparison_echo" type="number" min="0" step="1" value="{{ values.get('comparison_echo','0') if values else '0' }}"></label>
+      <label>Comparison target TE (ms) <small>0 = field-strength default</small><input name="comparison_te_ms" type="number" min="0" max="100" step="0.1" value="{{ values.get('comparison_te_ms','0') if values else '0' }}"></label>
+      <label class="wide">fMRIPrep output spaces <small>Blank = T1w and MNI152NLin6Asym</small><input name="output_spaces" type="text" placeholder="T1w MNI152NLin6Asym" value="{{ values.get('output_spaces','') if values else '' }}"></label>
+      <label class="choice wide"><input name="fmriprep_cifti" type="checkbox" {% if values and values.get('fmriprep_cifti') %}checked{% endif %}><span>Generate fMRIPrep comparison CIFTI</span></label>
+    </div>
+  </section>
+
+  <section class="form-section" id="dwi-settings">
+    <div class="section-heading"><span class="step">03</span><h2>Diffusion</h2></div>
+    <div class="fields">
+      <label class="wide">FreeSurfer subjects directory <small>Optional</small><input name="fs_subjects_dir" type="text" value="{{ values.get('fs_subjects_dir','') if values else '' }}"></label>
+      <label>GPU mode<select name="gpu">{% for option in ['auto','none','eddy','diffprep','drbuddi','all'] %}<option value="{{ option }}" {% if values and values.get('gpu') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Output resolution (mm)<input name="output_resolution" type="number" min="0.5" max="5" step="0.1" value="{{ values.get('output_resolution','1.5') if values else '1.5' }}"></label>
+      <label>b0 policy<select name="b0_policy">{% for option in ['auto','include','exclude'] %}<option value="{{ option }}" {% if values and values.get('b0_policy') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Reverse-PE b0 fieldmap<select name="dwi_b0_sdc"><option value="auto">Automatic</option><option value="none" {% if values and values.get('dwi_b0_sdc') == 'none' %}selected{% endif %}>None</option></select></label>
+      <label>Distortion correction<select name="sdc_method">{% for option in ['auto','topup','drbuddi','topup+drbuddi'] %}<option value="{{ option }}" {% if values and values.get('sdc_method') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>DWI geometry<select name="geometry_policy">{% for option in ['auto','preserve','resample'] %}<option value="{{ option }}" {% if values and values.get('geometry_policy') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Denoising<select name="denoise_method">{% for option in ['dwidenoise','patch2self','none'] %}<option value="{{ option }}" {% if values and values.get('denoise_method') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Gibbs unringing<select name="unringing_method">{% for option in ['mrdegibbs','rpg','none'] %}<option value="{{ option }}" {% if values and values.get('unringing_method') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label>Distortion-group merge<select name="distortion_group_merge">{% for option in ['concat','average','none'] %}<option value="{{ option }}" {% if values and values.get('distortion_group_merge') == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+      <label class="wide">Reverse-PE b0 source <small>Optional, BIDS-relative</small><input name="dwi_b0_source" type="text" value="{{ values.get('dwi_b0_source','') if values else '' }}"></label>
+      <label class="wide">Eddy configuration JSON <small>Optional</small><input name="eddy_config" type="text" value="{{ values.get('eddy_config','') if values else '' }}"></label>
+      <label class="wide">Reconstruction specification<input name="recon_spec" type="text" value="{{ values.get('recon_spec','auto') if values else 'auto' }}"></label>
+      <label class="wide">Atlases <small>Comma-separated; blank disables</small><input name="atlases" type="text" value="{{ values.get('atlases','Brainnetome246Ext,Glasser360') if values else 'Brainnetome246Ext,Glasser360' }}"></label>
+      <label class="wide">Processing BIDS copy directory <small>Optional</small><input name="processing_bids_dir" type="text" value="{{ values.get('processing_bids_dir','') if values else '' }}"></label>
+      <label class="choice wide"><input name="direct_bids_input" type="checkbox" {% if values and values.get('direct_bids_input') %}checked{% endif %}><span>Pass source BIDS directly to QSIPrep</span></label>
+      <label class="choice wide"><input name="separate_all_dwis" type="checkbox" {% if values and values.get('separate_all_dwis') %}checked{% endif %}><span>Process all DWI acquisitions separately</span></label>
+    </div>
+  </section>
+
+  <div class="form-actions"><button class="primary" type="submit">Review job &rarr;</button></div>
+</form>
+{% if jobs %}<section class="recent"><div class="section-heading"><h2>Recent jobs</h2></div><div class="job-list">{% for job in jobs %}<a href="/jobs/{{ job.id }}"><span>{{ job.plan.spec.workflow|upper }} <b>{{ job.plan.spec.stages|join(', ') if job.plan.spec.stages else job.plan.spec.stage }}</b></span><span>{% if job.plan.spec.workflow == 'dicom' and job.plan.spec.stage == 'inventory' %}Study inventory{% else %}sub-{{ job.plan.spec.participant }}{% endif %}</span><strong class="status status-{{ job.status }}">{{ job.status }}</strong></a>{% endfor %}</div></section>{% endif %}
+<script>
+const stageOrder = {{ stages|tojson }};
+const workflow = document.querySelector('#workflow');
+const stageOptions = document.querySelector('#stage-options');
+const initialStages = {{ (values.get('stages', []) if values else ['all'])|tojson }};
+const stageLabels = {all:'Full pipeline',preflight:'Preflight',fslr:'fsLR',fmriprep:'fMRIPrep',qsiprep:'QSIPrep',qsirecon:'QSIRecon',cifti:'CIFTI',qc:'QC',t2:'T2 refinement'};
+function renderStages(selected) {
+  stageOptions.replaceChildren(...stageOrder[workflow.value].map(stage => {
+    const label = document.createElement('label');
+    label.className = 'stage-option';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'stages';
+    input.value = stage;
+    input.checked = selected.includes(stage);
+    label.append(input, document.createTextNode(stageLabels[stage] || stage));
+    return label;
+  }));
+}
+stageOptions.addEventListener('change', event => {
+  if (event.target.checked && (event.target.value === 'all' || workflow.value === 'dicom')) {
+    for (const input of stageOptions.querySelectorAll('input')) if (input !== event.target) input.checked = false;
+  } else if (event.target.checked) {
+    const all = stageOptions.querySelector('input[value="all"]');
+    if (all) all.checked = false;
+  }
+  updateForm();
+});
+function setVisible(selector, visible) {
+  const element = document.querySelector(selector);
+  element.hidden = !visible;
+  for (const input of element.querySelectorAll('input, select')) input.disabled = !visible;
+}
+function updateForm() {
+  const selected = workflow.value;
+  const inventoryOnly = selected === 'dicom' && stageOptions.querySelector('input[value="inventory"]')?.checked;
+  const participantField = document.querySelector('#participant-field');
+  const participantInput = participantField.querySelector('input');
+  participantField.hidden = Boolean(inventoryOnly);
+  participantInput.required = !inventoryOnly;
+  participantInput.disabled = Boolean(inventoryOnly);
+  setVisible('#dicom-settings', selected === 'dicom');
+  setVisible('#processing-settings', selected !== 'dicom');
+  setVisible('#anat-settings', selected === 'anat');
+  setVisible('#bold-settings', selected === 'bold');
+  setVisible('#dwi-settings', selected === 'dwi');
+  for (const selector of ['#omp-field', '#memory-field', '#skip-validation-field']) setVisible(selector, ['bold','dwi'].includes(selected));
+}
+workflow.addEventListener('change', () => {
+  renderStages([workflow.value === 'dicom' ? 'inventory' : 'all']);
+  updateForm();
+});
+renderStages(initialStages);
+updateForm();
+</script>
+{% endblock %}

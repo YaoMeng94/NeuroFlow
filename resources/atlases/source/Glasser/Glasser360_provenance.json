@@ -1,0 +1,12 @@
+{
+  "SourceImage": "resources/atlases/source/Glasser/Glasser_space-MNI152NLin6_res-1x1x1.nii.gz",
+  "SourceLabels": "resources/atlases/source/Glasser/Glasser.csv",
+  "SourceAtlas": "Neuroparc Glasser volumetric atlas",
+  "SourceURL": "https://github.com/neurodata/neuroparc",
+  "SourceLicense": "Apache-2.0",
+  "SourceLicenseURL": "https://github.com/neurodata/neuroparc/blob/master/LICENSE.md",
+  "AtlasReference": "Glasser et al. Nature 2016;536:171-178. doi:10.1038/nature18933",
+  "SourceTemplate": "MNI152NLin6",
+  "Method": "Labels 1-180 retained for world x<=0; right-hemisphere voxels at world x>0 offset by 180.",
+  "LabelCount": 360
+}

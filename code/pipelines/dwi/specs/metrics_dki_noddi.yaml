@@ -1,0 +1,29 @@
+name: metrics_dki_noddi
+space: T1w
+anatomical: []
+nodes:
+- name: dipy_dki
+  software: Dipy
+  action: DKI_reconstruction
+  input: qsirecon
+  qsirecon_suffix: DIPYDKI
+  parameters:
+    wmti: false
+    msdki: false
+    write_fibgz: false
+    write_mif: false
+- name: amico_noddi
+  software: AMICO
+  action: fit_noddi
+  input: qsirecon
+  qsirecon_suffix: AMICONODDI
+  parameters:
+    dPar: 0.0017
+    dIso: 0.003
+    doNormalize: true
+    fitMethod: WLS
+    saveModulatedMaps: true
+    rmse: true
+    nrmse: true
+    plot_reports: true
+    num_threads: 16

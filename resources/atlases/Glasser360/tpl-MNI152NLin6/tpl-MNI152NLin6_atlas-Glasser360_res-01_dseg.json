@@ -1,0 +1,11 @@
+{
+  "AtlasName": "Glasser360",
+  "AtlasDescription": "Volumetric label atlas packaged for QSIRecon.",
+  "Template": "MNI152NLin6",
+  "SourceTemplate": "MNI152NLin6",
+  "ResolutionLabel": "01",
+  "SourceImage": "resources/atlases/source/Glasser/Glasser360_space-MNI152NLin6_res-1x1x1.nii.gz",
+  "SourceLabels": "resources/atlases/source/Glasser/Glasser360.csv",
+  "SourceProvenance": "atlas_provenance.json",
+  "LabelCount": 360
+}

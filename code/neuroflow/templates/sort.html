@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}DICOM sorter | NeuroFlow{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>DICOM sorter</h1><p>Group a scanner export by DICOM series and copy each series into its rule-matched folder.</p></div></div>
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+{% if copied %}<div class="success" role="status">Sorted copies were written to the output folder. The source DICOM files were left unchanged. To continue to BIDS, open <a href="/">New job</a>, choose DICOM to BIDS, and review the series inventory and mapping before conversion.</div>{% endif %}
+<form action="/sort/preview" method="post" class="sort-form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="form-section"><div class="fields">
+    <label class="wide">Scanner export folder<input name="source" required value="{{ source }}" placeholder="/path/to/scanner-export"></label>
+    <label class="wide">Sorted output folder<input name="output" required value="{{ output }}" placeholder="/path/to/sorted-dicom"></label>
+    <label class="wide">Rule preset JSON<input name="rules" required value="{{ rules }}" placeholder="/path/to/dicom_sort_rules.json"></label>
+  </div><p class="field-note">Create a starter rule file with <code>neuroflow init-sort-rules /path/to/dicom_sort_rules.json</code>, then edit the JSON rules for your protocol. Sorting copies files and never edits the scanner export.</p>
+  <div class="form-actions"><button class="primary" type="submit">Preview series</button></div></section>
+</form>
+{% if rows %}
+<section class="recent"><div class="section-heading"><div><h2>Series preview</h2><p>{{ rows|length }} series found. Each series stays intact in its own folder.</p></div></div>
+<div class="table-scroll"><table><thead><tr><th>Subject ID</th><th>Series</th><th>Sequence / protocol</th><th>Files</th><th>Category</th><th>Rule</th><th>Status</th>{% if copied %}<th>Output</th>{% endif %}</tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.study }}</td><td>{{ row.series_number }}</td><td>{{ row.description }}{% if row.protocol_name and row.protocol_name != row.description %}<br><span class="muted">{{ row.protocol_name }}</span>{% endif %}</td><td>{{ row.file_count }}</td><td>{{ row.category }}</td><td>{{ row.rule or '—' }}</td><td>{{ row.status }}</td>{% if copied %}<td class="path-cell">{{ row.output }}</td>{% endif %}</tr>{% endfor %}
+</tbody></table></div>
+{% if not copied %}<form action="/sort/apply" method="post" class="form-actions review-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="source" value="{{ source }}"><input type="hidden" name="output" value="{{ output }}"><input type="hidden" name="rules" value="{{ rules }}">
+{% if rows|selectattr('status','ne','matched')|list %}<label class="choice"><input type="checkbox" name="reviewed" value="yes" required><span>I reviewed the unmatched and ambiguous series. They will be copied under their review category.</span></label>{% else %}<p class="field-note">All series have one matching rule. The files will be copied into sub-ID/category/series folders.</p>{% endif %}
+<button class="primary" type="submit">Copy series to output</button></form>{% endif %}</section>{% endif %}
+{% endblock %}

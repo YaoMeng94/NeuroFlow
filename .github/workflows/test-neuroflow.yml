@@ -1,0 +1,101 @@
+name: Test NeuroFlow
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  linux-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build and inspect the installable wheel
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir dist
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel, = Path("dist").glob("neuroflow-*.whl")
+          with ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = {
+              "neuroflow/cli.py",
+              "neuroflow/templates/home.html",
+              "neuroflow/static/app.css",
+              "neuroflow/pipelines/anat/run_anat_bidsapp.sh",
+              "neuroflow/pipelines/bold/run_bold_bidsapp.sh",
+              "neuroflow/pipelines/dwi/run_dwi_bidsapp.sh",
+          }
+          missing = required - names
+          if missing:
+              raise SystemExit(f"wheel is missing required resources: {sorted(missing)}")
+          print(f"Verified {wheel.name}: controller, GUI assets, and all modality launchers")
+          PY
+      - name: Build wheelhouse and install test profile offline
+        run: |
+          wheel="$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name 'neuroflow-*.whl' -print -quit)"
+          wheelhouse="$RUNNER_TEMP/neuroflow-test-wheelhouse"
+          test_venv="$RUNNER_TEMP/neuroflow-test-env"
+          mkdir -p "$wheelhouse"
+          bash code/scripts/build_hpc_wheelhouse.sh "$wheel" "$wheelhouse" test
+          bash code/scripts/install_neuroflow_hpc.sh "$wheelhouse" test "$test_venv"
+          "$test_venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          import fastapi, httpx, jinja2, multipart, nibabel, numpy, pydicom, pypdf, reportlab, scipy, PIL, uvicorn
+
+          profile = Path.home() / ".config/neuroflow/site.json"
+          data = json.loads(profile.read_text())
+          assert Path(data["pipeline_root"]).is_dir(), data["pipeline_root"]
+          print("Offline environment dependencies and bundled launchers: PASS")
+          PY
+      - name: Test the Linux per-user installer
+        run: bash code/scripts/test_install_neuroflow_linux.sh "$RUNNER_TEMP/neuroflow-test-wheelhouse"
+      - name: Verify Linux installer and sorter on glibc 2.17
+        run: |
+          docker run --rm --platform linux/amd64 \
+            -e PATH=/opt/python/cp311-cp311/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -v "$GITHUB_WORKSPACE:/src:ro" \
+            -v "$RUNNER_TEMP/neuroflow-test-wheelhouse:/wheelhouse:ro" \
+            -w /src quay.io/pypa/manylinux2014_x86_64:latest \
+            bash -lc '
+              set -euo pipefail
+              bash code/scripts/test_install_neuroflow_linux.sh /wheelhouse
+              python3 -m venv /tmp/neuroflow-glibc217-test
+              /tmp/neuroflow-glibc217-test/bin/pip install --no-index --find-links /wheelhouse "neuroflow[test]"
+              PYTHONPATH=/src/code /tmp/neuroflow-glibc217-test/bin/python -m unittest \
+                neuroflow.tests.test_dicom_sort -v
+            '
+      - name: Run unit and web tests from the installed package
+        run: |
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/neuroflow-test-env/bin/python" - <<'PY'
+          import os
+          from pathlib import Path
+          import sys
+          import unittest
+
+          tests = Path(os.environ["GITHUB_WORKSPACE"]) / "code" / "neuroflow" / "tests"
+          suite = unittest.defaultTestLoader.discover(str(tests))
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if result.skipped:
+              print(f"Unexpected skipped tests: {result.skipped}", file=sys.stderr)
+              raise SystemExit(1)
+          if not result.wasSuccessful():
+              raise SystemExit(1)
+          PY
+      - name: Run modality launcher smoke tests
+        run: |
+          export PATH="$RUNNER_TEMP/neuroflow-test-env/bin:$PATH"
+          bash code/pipelines/anat/test_anat_bidsapp.sh
+          bash code/pipelines/bold/test_bold_stage_dependencies.sh
+          bash code/pipelines/bold/test_bold_freesurfer_policy.sh
+          python code/pipelines/dwi/test_dwi_pipeline.py
+          python code/pipelines/dwi/test_verify_dwi_metrics.py
+          bash code/scripts/test_build_hpc_wheelhouse.sh
+          bash code/scripts/test_install_neuroflow_hpc.sh

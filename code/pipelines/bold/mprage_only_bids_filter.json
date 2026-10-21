@@ -1,0 +1,23 @@
+{
+  "t1w": {
+    "datatype": "anat",
+    "suffix": "T1w",
+    "acquisition": "mprage"
+  },
+  "t2w": {
+    "datatype": "anat",
+    "suffix": "T2w",
+    "acquisition": "spc"
+  },
+  "bold": {
+    "datatype": "func",
+    "suffix": "bold"
+  },
+  "sbref": {
+    "datatype": "func",
+    "suffix": "sbref"
+  },
+  "fmap": {
+    "datatype": "fmap"
+  }
+}

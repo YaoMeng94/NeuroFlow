@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job.id[:8] }} | NeuroFlow{% endblock %}
+{% block head %}{% if job.status in ('queued','running') %}<meta http-equiv="refresh" content="8">{% endif %}{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>Job {{ job.id[:8] }}</h1><p>{{ job.plan.spec.workflow|upper }} / {{ job.plan.spec.stages|join(' + ') if job.plan.spec.stages else job.plan.spec.stage }}{% if job.plan.spec.workflow == 'dicom' and job.plan.spec.stage == 'inventory' %} / Study inventory{% else %} / sub-{{ job.plan.spec.participant }}{% endif %}</p></div><strong class="status status-{{ job.status }}">{{ job.status }}</strong></div>
+<section class="form-section"><div class="section-heading"><h2>Run details</h2></div><dl class="detail-grid"><dt>Created</dt><dd>{{ job.created_at }}</dd><dt>Output</dt><dd>{{ job.plan.spec.output_dir }}</dd><dt>Stage</dt><dd>{% if job.current_stage is defined and job.current_stage %}{{ job.current_stage }}{% elif job.total_stages is defined %}{{ job.completed_stages }} / {{ job.total_stages }}{% else %}Pending{% endif %}</dd><dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is defined else 'Pending' }}</dd></dl></section>
+<section class="form-section"><div class="section-heading"><h2>Commands</h2></div>{% for command in commands %}<pre class="command">{{ command }}</pre>{% endfor %}</section>
+{% if task_commands %}<section class="form-section"><div class="section-heading"><h2>{{ job.plan.spec.workflow|upper }} launcher inside the Nextflow task</h2></div>{% for command in task_commands %}<pre class="command">{{ command }}</pre>{% endfor %}</section>{% endif %}
+<section class="form-section"><div class="section-heading"><h2>Log</h2></div><pre class="log">{{ log or 'Waiting for output.' }}</pre></section>
+{% if job.plan.spec.workflow in ('anat', 'bold', 'dwi') %}<section class="form-section"><div class="section-heading"><h2>Pipeline activity</h2></div><pre class="log">{{ pipeline_log or 'Waiting for pipeline output.' }}</pre></section>{% endif %}
+{% if job.plan.spec.workflow == 'dicom' and job.plan.spec.stage == 'inventory' and job.status == 'completed' %}<a class="text-link" href="/inventory?path={{ job.plan.spec.output_dir|urlencode }}">Inspect series &rarr;</a>{% endif %}
+{% endblock %}

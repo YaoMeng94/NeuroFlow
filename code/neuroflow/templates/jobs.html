@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Jobs | NeuroFlow{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>Jobs</h1><p>Persistent records for this user's workbench.</p></div><a class="text-link" href="/">New job &rarr;</a></div>
+{% if jobs %}<div class="job-list">{% for job in jobs %}<a href="/jobs/{{ job.id }}"><span>{{ job.plan.spec.workflow|upper }} <b>{{ job.plan.spec.stage }}</b></span><span>{% if job.plan.spec.workflow == 'dicom' and job.plan.spec.stage == 'inventory' %}Study inventory{% else %}sub-{{ job.plan.spec.participant }}{% endif %}</span><span>{{ job.created_at[:19].replace('T',' ') }}</span><strong class="status status-{{ job.status }}">{{ job.status }}</strong></a>{% endfor %}</div>{% else %}<p class="empty">No jobs yet.</p>{% endif %}
+{% endblock %}

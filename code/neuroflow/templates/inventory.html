@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Series inventory | NeuroFlow{% endblock %}
+{% block content %}
+<div class="page-heading"><div><h1>Series inventory</h1><p>Converted sidecar metadata for mapping review.</p></div><a class="text-link" href="/">New conversion &rarr;</a></div>
+<form action="/inventory" method="get" class="inventory-search"><label>Helper output directory<input name="path" type="text" value="{{ path }}" placeholder="/data/project/dicom-inventory"></label><button type="submit">Open</button></form>
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+{% if path and groups %}<form action="/inventory" method="get" class="inventory-search"><input type="hidden" name="path" value="{{ path }}"><label>Study group<select name="source_group" onchange="this.form.submit()">{% for key, label in groups %}<option value="{{ key }}" {% if key == selected_group %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label><button type="submit">Filter</button></form>{% if groups|length > 1 %}<p class="field-note">Multiple acquisition groups found. Save and convert each group with its own participant label; a single mapping must not combine them.</p>{% endif %}{% endif %}
+{% if rows %}
+{% if suggested_t1w is not none %}<p class="field-note">A unique Siemens NORM T1w candidate is preselected. Verify the image type and gradient-correction metadata before conversion.</p>{% endif %}
+<form action="/inventory/mapping" method="post">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="path" value="{{ path }}"><input type="hidden" name="source_group" value="{{ selected_group }}">
+<div class="table-scroll"><table><thead><tr><th>Study group</th><th>Series / source</th><th>Acquisition</th><th>DICOM image type</th><th>Echo / TR</th><th>PE / readout</th><th>Datatype</th><th>Suffix</th><th>Entities</th><th>Mapping ID</th><th>IntendedFor IDs</th></tr></thead><tbody>
+{% for row in rows %}<tr>
+  <td>{{ row.source_group_label }}</td>
+  <td><strong>{{ row.SeriesNumber|default('') }}</strong>{% if loop.index0 == suggested_t1w %}<br><small>Default T1w (NORM)</small>{% endif %}<br>{{ row.SeriesDescription|default('') }}<br><small>{{ row.file }}</small></td>
+  <td>{{ row.AcquisitionTime|default('?') }}<br><small>{{ row.AcquisitionDuration|default('?') }} s</small></td>
+  <td>{{ row.ImageType|default('?') }}<br><small>{{ row.ImageTypeText|default('') }}</small><br><small>Nonlinear gradient correction: {{ row.NonlinearGradientCorrection|default('unknown') }}</small></td>
+  <td>Echo {{ row.EchoNumber|default('?') }}: {{ row.EchoTime|default('?') }} s<br><small>TR {{ row.RepetitionTime|default('?') }} s</small></td>
+  <td>{{ row.PhaseEncodingDirection|default('?') }}<br><small>{{ row.TotalReadoutTime|default('?') }}</small></td>
+  <td><select name="row_{{ loop.index0 }}_datatype"><option value="skip" {% if loop.index0 != suggested_t1w %}selected{% endif %}>Exclude</option><option value="anat" {% if loop.index0 == suggested_t1w %}selected{% endif %}>anat</option><option value="func">func</option><option value="dwi">dwi</option><option value="fmap">fmap</option></select></td>
+  <td><input name="row_{{ loop.index0 }}_suffix" value="{{ 'T1w' if loop.index0 == suggested_t1w else '' }}" placeholder="T1w / bold / dwi / epi"></td>
+  <td><input name="row_{{ loop.index0 }}_entities" placeholder="task-rest_run-1"></td>
+  <td><input name="row_{{ loop.index0 }}_id" placeholder="series{{ row.SeriesNumber }}"></td>
+  <td><input name="row_{{ loop.index0 }}_intendedfor" placeholder="bold1,dwi1"></td>
+</tr>{% endfor %}
+</tbody></table></div>
+<div class="form-actions"><button class="primary" type="submit">Save mapping draft &rarr;</button></div>
+</form>
+{% elif path and not error %}<p class="empty">No dcm2niix series sidecars found in this directory.</p>{% endif %}
+{% endblock %}

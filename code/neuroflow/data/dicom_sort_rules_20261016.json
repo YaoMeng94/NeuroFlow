@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "description": "Siemens Prisma protocol example preset. Review and adapt before using with another scanner or protocol.",
+  "rules": [
+    {
+      "name": "anatomical_mri",
+      "category": "anat",
+      "match": {
+        "SeriesDescription": "^(?:3dT1w_mpr_sag_1mm|3dT2w_spc_sag_(?:0\\.8|1)mm|3dgre_LocusCoeruleus(?:_ND)?|HIPPO_t2_tse_cor_2mm|t1_tse_dark-fluid_tra)$",
+        "ProtocolName": "^(?:3dT1w_mpr_sag_1mm|3dT2w_spc_sag_(?:0\\.8|1)mm|3dgre_LocusCoeruleus|HIPPO_t2_tse_cor_2mm|t1_tse_dark-fluid_tra)$"
+      }
+    },
+    {
+      "name": "localizers_and_scouts",
+      "category": "localizer",
+      "match": {
+        "SeriesDescription": "^(?:AAHScout(?:_MPR_(?:cor|sag|tra))?|AAhead_scout(?:_MPR_(?:cor|sag|tra))?)$",
+        "ProtocolName": "^(?:AAHScout|AAhead_scout)$"
+      }
+    },
+    {
+      "name": "spin_echo_fieldmaps",
+      "category": "fmap",
+      "match": {
+        "SeriesDescription": "^SpinEchoFieldMap_2\\.5mm_(?:AP|PA)$",
+        "ProtocolName": "^SpinEchoFieldMap_2\\.5mm_(?:AP|PA)$"
+      }
+    },
+    {
+      "name": "resting_state_multiecho_bold_and_sbref",
+      "category": "func",
+      "match": {
+        "SeriesDescription": "^mbep2d_bold_REST[12]_MB6_echo5_10_87_2\\.5mm(?:_SBRef)?$",
+        "ProtocolName": "^mbep2d_bold_REST[12]_MB6_echo5_10_87_2\\.5mm$"
+      }
+    },
+    {
+      "name": "physiolog_recordings",
+      "category": "physio",
+      "match": {
+        "SeriesDescription": "^mbep2d_(?:bold_REST[12]_MB6_echo5_10_87_2\\.5mm|diff_dir(?:98|99)(?:b0)?_1\\.5mm_(?:AP|PA))_PhysioLog$",
+        "ProtocolName": "^mbep2d_(?:bold_REST[12]_MB6_echo5_10_87_2\\.5mm|diff_dir(?:98|99)(?:b0)?_1\\.5mm_(?:AP|PA))$"
+      }
+    },
+    {
+      "name": "diffusion_and_b0_sbref",
+      "category": "dwi",
+      "match": {
+        "SeriesDescription": "^mbep2d_diff_dir(?:98|99)(?:b0)?_1\\.5mm_(?:AP|PA)(?:_SBRef)?$",
+        "ProtocolName": "^mbep2d_diff_dir(?:98|99)(?:b0)?_1\\.5mm_(?:AP|PA)$"
+      }
+    },
+    {
+      "name": "siemens_protocol_reports",
+      "category": "scanner_reports",
+      "match": {
+        "SeriesDescription": "^PhoenixZIPReport$",
+        "ProtocolName": "^Phoenix Document$"
+      }
+    }
+  ]
+}

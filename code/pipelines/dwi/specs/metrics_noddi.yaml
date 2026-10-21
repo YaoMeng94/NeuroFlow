@@ -1,0 +1,19 @@
+name: metrics_noddi
+space: T1w
+anatomical: []
+nodes:
+- name: amico_noddi
+  software: AMICO
+  action: fit_noddi
+  input: qsirecon
+  qsirecon_suffix: AMICONODDI
+  parameters:
+    dPar: 0.0017
+    dIso: 0.003
+    doNormalize: true
+    fitMethod: WLS
+    saveModulatedMaps: true
+    rmse: true
+    nrmse: true
+    plot_reports: true
+    num_threads: 16

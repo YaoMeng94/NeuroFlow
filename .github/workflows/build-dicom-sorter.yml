@@ -1,0 +1,341 @@
+name: Build NeuroFlow platform bundles
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "neuroflow-v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install the standalone build dependencies
+        run: python -m pip install ".[standalone]"
+      - name: Build the desktop app
+        run: python code/packaging/build_standalone.py
+      - name: Verify macOS bundle version metadata
+        if: runner.os == 'macOS'
+        run: |
+          python - <<'PY'
+          import plistlib
+          import tomllib
+          from pathlib import Path
+
+          expected = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
+          plist_path = Path('dist/standalone_sorter/NeuroFlowDICOMSorter.app/Contents/Info.plist')
+          plist = plistlib.loads(plist_path.read_bytes())
+          for key in ('CFBundleShortVersionString', 'CFBundleVersion'):
+              if plist.get(key) != expected:
+                  raise SystemExit(f'{key}={plist.get(key)!r}; expected {expected!r}')
+          PY
+      - name: Self-test the bundled app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '& "dist\standalone_sorter\NeuroFlowDICOMSorter\NeuroFlowDICOMSorter.exe" --self-test'
+      - name: Exercise the DICOM sorter workflow (Windows)
+        if: runner.os == 'Windows'
+        run: python code/neuroflow/tests/standalone_gui_integration.py
+      - name: Exercise the DICOM sorter workflow (macOS)
+        if: runner.os == 'macOS'
+        run: python code/neuroflow/tests/standalone_gui_integration.py
+      - name: Self-test the bundled app (macOS)
+        if: runner.os == 'macOS'
+        run: ./dist/standalone_sorter/NeuroFlowDICOMSorter.app/Contents/MacOS/NeuroFlowDICOMSorter --self-test
+      - name: Verify the packaged GUI survives startup (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python - <<'PY'
+          import subprocess
+          import time
+          from pathlib import Path
+
+          app = Path("dist/standalone_sorter/NeuroFlowDICOMSorter.app/Contents/MacOS/NeuroFlowDICOMSorter")
+          process = subprocess.Popen([str(app)], stdout=subprocess.DEVNULL)
+          try:
+              try:
+                  code = process.wait(timeout=8)
+              except subprocess.TimeoutExpired:
+                  print("Packaged macOS GUI remained active through startup check")
+              else:
+                  raise SystemExit(f"Packaged macOS GUI exited during startup with status {code}")
+          finally:
+              if process.poll() is None:
+                  process.terminate()
+                  try:
+                      process.wait(timeout=5)
+                  except subprocess.TimeoutExpired:
+                      process.kill()
+                      process.wait(timeout=5)
+          PY
+      - name: Archive macOS app bundle
+        if: runner.os == 'macOS'
+        run: |
+          version="$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          ditto -c -k --sequesterRsrc --keepParent dist/standalone_sorter/NeuroFlowDICOMSorter.app "NeuroFlowDICOMSorter-macOS-${{ runner.arch }}-${version}.zip"
+      - name: Checksum macOS archive
+        if: runner.os == 'macOS'
+        run: |
+          archive="$(find . -maxdepth 1 -name 'NeuroFlowDICOMSorter-macOS-*.zip' -print -quit)"
+          test -n "$archive"
+          shasum -a 256 "$archive" > "$archive.sha256"
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Create Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (& python -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text())['project']['version'])").Trim()
+          $expected = '#define AppVersion "' + $version + '"'
+          if (-not (Select-String -LiteralPath 'code/packaging/windows/NeuroFlowDICOMSorter.iss' -SimpleMatch -Pattern $expected)) {
+            throw "Inno Setup AppVersion does not match project version $version"
+          }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" code/packaging/windows/NeuroFlowDICOMSorter.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup exited with $LASTEXITCODE" }
+      - name: Install, self-test, and uninstall the Windows package
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
+          $installer = $installer.FullName
+          $installDir = Join-Path $env:RUNNER_TEMP 'NeuroFlowSorterTest'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
+          $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
+          if (-not (Test-Path $app)) { throw 'Installed sorter executable is missing' }
+          & $app --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Installed sorter self-test exited with $LASTEXITCODE" }
+          $gui = Start-Process -FilePath $app -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            if ($gui.HasExited) { throw 'Installed sorter exited during its first GUI launch.' }
+          } finally {
+            if (-not $gui.HasExited) { Stop-Process -Id $gui.Id -Force }
+          }
+          $profile = Join-Path $env:APPDATA 'NeuroFlow DICOM Sorter'
+          New-Item -ItemType Directory -Path $profile -Force | Out-Null
+          $profileMarker = Join-Path $profile 'deployment-test-marker'
+          Set-Content -Path $profileMarker -Value 'preserve' -Encoding ascii
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          $remove = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
+          if ($remove.ExitCode -ne 0) { throw "Uninstaller exited with $($remove.ExitCode)" }
+          if (Test-Path $app) { throw 'Sorter executable remains after uninstall' }
+          if (-not (Test-Path $profileMarker)) { throw 'Sorter uninstall removed user profile data' }
+      - name: Checksum Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeuroFlowDICOMSorter-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            NeuroFlowDICOMSorter-*.exe
+            NeuroFlowDICOMSorter-*.zip
+            NeuroFlowDICOMSorter-*.sha256
+          if-no-files-found: error
+
+  package-linux-controller:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build controller wheel and offline pipeline wheelhouse
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir dist
+          wheel="$(find dist -maxdepth 1 -name 'neuroflow-*.whl' -print -quit)"
+          bash code/scripts/build_hpc_wheelhouse.sh "$wheel" dist/linux-wheelhouse pipeline
+      - name: Test offline installer validation and failed-install cleanup
+        run: bash code/scripts/test_install_neuroflow_hpc.sh dist/linux-wheelhouse
+      - name: Package Linux/HPC installation bundle
+        run: bash code/scripts/package_neuroflow_linux.sh dist/linux-wheelhouse dist/linux-release
+      - name: Install-test the packaged Linux bundle
+        run: |
+          command -v xvfb-run >/dev/null || { sudo apt-get update && sudo apt-get install -y xvfb; }
+          archive="$(find dist/linux-release -maxdepth 1 -name '*.tar.gz' -print -quit)"
+          mkdir -p "$RUNNER_TEMP/linux-bundle"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/linux-bundle"
+          bundle="$(find "$RUNNER_TEMP/linux-bundle" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          export HOME="$RUNNER_TEMP/neuroflow-linux-home"
+          mkdir -p "$HOME"
+          cd "$bundle"
+          bash code/scripts/install_neuroflow_linux.sh
+          "$HOME/.local/bin/neuroflow" --help >/dev/null
+          if [[ -x "$HOME/.local/bin/neuroflow-dicom-sorter" ]]; then
+            "$HOME/.local/bin/neuroflow-dicom-sorter" --self-test
+            venv="$(find "$HOME/.venvs" -mindepth 1 -maxdepth 1 -type d -name 'neuroflow-*' -print -quit)"
+            XDG_CONFIG_HOME="$RUNNER_TEMP/neuroflow-sorter-test-config" xvfb-run -a \
+              "$venv/bin/python" "$GITHUB_WORKSPACE/code/neuroflow/tests/standalone_gui_integration.py"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeuroFlow-Linux-controller
+          path: dist/linux-release/*
+          if-no-files-found: error
+
+  package-windows-controller:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test Windows controller job locking
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = 'code'
+          python -m unittest `
+            neuroflow.tests.test_jobs.JobTests.test_job_module_imports_without_posix_fcntl_on_windows `
+            neuroflow.tests.test_jobs.JobTests.test_windows_output_lock_uses_nonblocking_msvcrt_lock `
+            neuroflow.tests.test_jobs.JobTests.test_windows_job_status_uses_read_only_process_probe `
+            neuroflow.tests.test_jobs.JobTests.test_worker_process_options_are_platform_specific `
+            neuroflow.tests.test_jobs.JobTests.test_modality_jobs_reject_native_windows_execution `
+            neuroflow.tests.test_jobs.JobTests.test_concurrent_jobs_for_same_subject_and_output_are_excluded -v
+      - name: Build controller wheel
+        run: python -m pip wheel --no-deps . --wheel-dir dist
+      - name: Build the offline Windows controller bundle
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter 'neuroflow-*.whl' | Select-Object -First 1
+          .\code\scripts\package_neuroflow_windows.ps1 -WheelPath $wheel.FullName -OutputDirectory dist\windows-release
+      - name: Install, preserve profile, launch, and uninstall controller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Get-ChildItem dist\windows-release -Filter '*.zip' | Select-Object -First 1
+          $manifest = Get-Content "$($archive.FullName).sha256"
+          if ($manifest -notmatch '^([A-Fa-f0-9]{64})\s+') { throw 'Invalid bundle checksum manifest' }
+          if ((Get-FileHash $archive.FullName -Algorithm SHA256).Hash -ne $Matches[1]) { throw 'Bundle checksum mismatch' }
+          $extract = Join-Path $env:RUNNER_TEMP 'neuroflow-windows-bundle'
+          Expand-Archive -Path $archive.FullName -DestinationPath $extract -Force
+          $bundle = Get-ChildItem $extract -Directory | Select-Object -First 1
+          $failedRoot = Join-Path $env:RUNNER_TEMP 'neuroflow-windows-failed-install'
+          New-Item -ItemType Directory -Path $failedRoot -Force | Out-Null
+          $failedBundle = Join-Path $failedRoot $bundle.Name
+          Copy-Item -LiteralPath $bundle.FullName -Destination $failedBundle -Recurse
+          $failedWheelhouse = Join-Path $failedBundle 'wheelhouse'
+          $dependencyWheel = Get-ChildItem $failedWheelhouse -Filter 'pydicom-*.whl' | Select-Object -First 1
+          if (-not $dependencyWheel) { throw 'Windows bundle has no pydicom wheel for the failed-install check.' }
+          Remove-Item -LiteralPath $dependencyWheel.FullName -Force
+          $updatedManifest = Get-ChildItem $failedWheelhouse -Filter '*.whl' | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $updatedManifest | Set-Content -Encoding ascii (Join-Path $failedWheelhouse 'SHA256SUMS')
+          $savedLocalAppData = $env:LOCALAPPDATA
+          $savedAppData = $env:APPDATA
+          $env:LOCALAPPDATA = Join-Path $failedRoot 'local-app-data'
+          $env:APPDATA = Join-Path $failedRoot 'app-data'
+          try {
+            try {
+              & (Join-Path $failedBundle 'install_neuroflow_windows.ps1')
+              throw 'Expected offline installation to fail with an incomplete wheelhouse.'
+            } catch {
+              if ($_.Exception.Message -notmatch 'Offline NeuroFlow installation failed') { throw }
+            }
+            $neuroflowWheel = Get-ChildItem $failedWheelhouse -Filter 'neuroflow-*.whl' | Select-Object -First 1
+            if (-not $neuroflowWheel) { throw 'Failed-install test bundle lost the NeuroFlow wheel.' }
+            $failedVersion = $neuroflowWheel.BaseName -replace '^neuroflow-(.+)-py3-none-any$', '$1'
+            $failedVenv = Join-Path $env:LOCALAPPDATA "NeuroFlow\venvs\$failedVersion"
+            if (Test-Path -LiteralPath $failedVenv) { throw 'Failed Windows install left a partial virtual environment.' }
+          } finally {
+            $env:LOCALAPPDATA = $savedLocalAppData
+            $env:APPDATA = $savedAppData
+          }
+          & (Join-Path $bundle.FullName 'install_neuroflow_windows.ps1')
+          $startMenuShortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\NeuroFlow\NeuroFlow.lnk'
+          if (-not (Test-Path $startMenuShortcut)) { throw 'NeuroFlow Start Menu shortcut was not created' }
+          $site = Join-Path $env:APPDATA 'NeuroFlow\site.json'
+          $siteData = Get-Content $site -Raw | ConvertFrom-Json
+          Add-Member -InputObject $siteData -NotePropertyName deployment_test_marker -NotePropertyValue 'keep-on-reinstall' -Force
+          $siteData | ConvertTo-Json -Depth 20 | Set-Content $site
+          & (Join-Path $bundle.FullName 'install_neuroflow_windows.ps1')
+          $siteData = Get-Content $site -Raw | ConvertFrom-Json
+          if ($siteData.deployment_test_marker -ne 'keep-on-reinstall') { throw 'Reinstall overwrote the user site profile' }
+          $version = (Get-Content "$env:LOCALAPPDATA\NeuroFlow\current-version.txt" -Raw).Trim()
+          $exe = "$env:LOCALAPPDATA\NeuroFlow\venvs\$version\Scripts\neuroflow.exe"
+          $server = Start-Process -FilePath $exe -ArgumentList 'serve' -PassThru
+          $ready = $false
+          try {
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              if ($server.HasExited) { break }
+              try { Invoke-WebRequest 'http://127.0.0.1:8765/' -UseBasicParsing -TimeoutSec 1 | Out-Null; $ready = $true; break }
+              catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw 'NeuroFlow server did not serve its first page on loopback.' }
+          } finally {
+            if (-not $server.HasExited) { Stop-Process -Id $server.Id -Force }
+          }
+          $jobState = Join-Path $env:LOCALAPPDATA 'NeuroFlow\state\jobs'
+          New-Item -ItemType Directory -Path $jobState -Force | Out-Null
+          $jobMarker = Join-Path $jobState 'deployment-test-marker'
+          Set-Content -Path $jobMarker -Value 'preserve' -Encoding ascii
+          try {
+            & (Join-Path $bundle.FullName 'uninstall_neuroflow_windows.ps1') -Version '..' -NoPrompt
+            throw 'Uninstaller accepted a path-traversal version.'
+          } catch {
+            if ($_.Exception.Message -notmatch 'semantic version') { throw }
+          }
+          if (-not (Test-Path $jobMarker)) { throw 'Uninstaller removed job-state data after rejecting an invalid version.' }
+          & (Join-Path $bundle.FullName 'uninstall_neuroflow_windows.ps1') -Version $version -NoPrompt
+          if (Test-Path "$env:LOCALAPPDATA\NeuroFlow\venvs\$version") { throw 'Uninstaller left the versioned environment behind' }
+          if (-not (Test-Path $site)) { throw 'Uninstaller removed user configuration' }
+          $siteData = Get-Content $site -Raw | ConvertFrom-Json
+          if ($siteData.deployment_test_marker -ne 'keep-on-reinstall') { throw 'Uninstaller altered user configuration' }
+          if (-not (Test-Path $jobMarker)) { throw 'Uninstaller removed job-state data' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeuroFlow-Windows-controller
+          path: dist/windows-release/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/neuroflow-v')
+    needs: [build, package-linux-controller, package-windows-controller]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify release tag matches package version
+        run: |
+          project_version="$(python -c 'import tomllib; from pathlib import Path; print(tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"])')"
+          tag_version="${GITHUB_REF_NAME#neuroflow-v}"
+          if [[ "$tag_version" != "$project_version" ]]; then
+            echo "Release tag $GITHUB_REF_NAME does not match package version $project_version" >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: NeuroFlow*
+          path: release-assets
+          merge-multiple: true
+      - name: Generate release checksums
+        run: |
+          cd release-assets
+          find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          draft: true
