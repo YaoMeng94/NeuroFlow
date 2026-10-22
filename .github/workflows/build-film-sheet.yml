@@ -66,6 +66,24 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: '& "dist/film_sheet/NeuroFlowMRIFilmSheet/NeuroFlowMRIFilmSheet.exe" --smoke-test'
+      - name: Capture Windows app screen for the user manual
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path manual-assets -Force | Out-Null
+          $appPath = "dist/film_sheet/NeuroFlowMRIFilmSheet/NeuroFlowMRIFilmSheet.exe"
+          $app = Start-Process -FilePath $appPath -PassThru
+          Start-Sleep -Seconds 5
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save("manual-assets/windows-film-sheet-app.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
       - name: Smoke test macOS desktop app and PDF output
         if: runner.os == 'macOS'
         run: |
@@ -102,6 +120,7 @@ jobs:
             NeuroFlowMRIFilmSheet-*.exe
             NeuroFlowMRIFilmSheet-*.dmg
             NeuroFlowMRIFilmSheet-*.tar.gz
+            manual-assets/windows-film-sheet-app.png
           if-no-files-found: error
 
   release:
