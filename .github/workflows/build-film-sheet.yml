@@ -83,6 +83,14 @@ jobs:
           $bitmap.Save("manual-assets/windows-film-sheet-app.png", [System.Drawing.Imaging.ImageFormat]::Png)
           $graphics.Dispose()
           $bitmap.Dispose()
+          [System.Windows.Forms.SendKeys]::SendWait("{PGDN}")
+          Start-Sleep -Seconds 1
+          $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save("manual-assets/windows-film-sheet-layout.png", [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bitmap.Dispose()
           Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
       - name: Smoke test macOS desktop app and PDF output
         if: runner.os == 'macOS'
@@ -121,6 +129,7 @@ jobs:
             NeuroFlowMRIFilmSheet-*.dmg
             NeuroFlowMRIFilmSheet-*.tar.gz
             manual-assets/windows-film-sheet-app.png
+            manual-assets/windows-film-sheet-layout.png
           if-no-files-found: error
 
   release:
