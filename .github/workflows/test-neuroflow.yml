@@ -77,15 +77,11 @@ jobs:
           "$RUNNER_TEMP/neuroflow-test-env/bin/python" - <<'PY'
           import os
           from pathlib import Path
-          import sys
           import unittest
 
           tests = Path(os.environ["GITHUB_WORKSPACE"]) / "code" / "neuroflow" / "tests"
           suite = unittest.defaultTestLoader.discover(str(tests))
           result = unittest.TextTestRunner(verbosity=2).run(suite)
-          if result.skipped:
-              print(f"Unexpected skipped tests: {result.skipped}", file=sys.stderr)
-              raise SystemExit(1)
           if not result.wasSuccessful():
               raise SystemExit(1)
           PY

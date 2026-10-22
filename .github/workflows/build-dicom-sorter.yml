@@ -117,8 +117,10 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
           $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
           if (-not (Test-Path $app)) { throw 'Installed sorter executable is missing' }
-          & $app --self-test
-          if ($LASTEXITCODE -ne 0) { throw "Installed sorter self-test exited with $LASTEXITCODE" }
+          $selfTest = Start-Process -FilePath $app -ArgumentList '--self-test' -Wait -PassThru `
+            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'sorter-self-test.log')
+          Get-Content (Join-Path $env:RUNNER_TEMP 'sorter-self-test.log')
+          if ($selfTest.ExitCode -ne 0) { throw "Installed sorter self-test exited with $($selfTest.ExitCode)" }
           $gui = Start-Process -FilePath $app -PassThru
           try {
             Start-Sleep -Seconds 5
@@ -274,15 +276,23 @@ jobs:
           if ($siteData.deployment_test_marker -ne 'keep-on-reinstall') { throw 'Reinstall overwrote the user site profile' }
           $version = (Get-Content "$env:LOCALAPPDATA\NeuroFlow\current-version.txt" -Raw).Trim()
           $exe = "$env:LOCALAPPDATA\NeuroFlow\venvs\$version\Scripts\neuroflow.exe"
-          $server = Start-Process -FilePath $exe -ArgumentList 'serve' -PassThru
+          $stdout = Join-Path $env:RUNNER_TEMP 'neuroflow-server.log'
+          $stderr = Join-Path $env:RUNNER_TEMP 'neuroflow-server.error.log'
+          $server = Start-Process -FilePath $exe -ArgumentList @('serve', '--port', '18765') -PassThru `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr
           $ready = $false
           try {
             for ($attempt = 0; $attempt -lt 30; $attempt++) {
               if ($server.HasExited) { break }
-              try { Invoke-WebRequest 'http://127.0.0.1:8765/' -UseBasicParsing -TimeoutSec 1 | Out-Null; $ready = $true; break }
+              try { Invoke-WebRequest 'http://127.0.0.1:18765/' -UseBasicParsing -TimeoutSec 1 -NoProxy | Out-Null; $ready = $true; break }
               catch { Start-Sleep -Seconds 1 }
             }
-            if (-not $ready) { throw 'NeuroFlow server did not serve its first page on loopback.' }
+            if (-not $ready) {
+              if (Test-Path $stdout) { Get-Content $stdout }
+              if (Test-Path $stderr) { Get-Content $stderr }
+              $exitCode = if ($server.HasExited) { $server.ExitCode } else { 'still running' }
+              throw "NeuroFlow server did not serve its first page on loopback (exit: $exitCode)."
+            }
           } finally {
             if (-not $server.HasExited) { Stop-Process -Id $server.Id -Force }
           }
