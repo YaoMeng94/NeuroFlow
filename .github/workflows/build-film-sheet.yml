@@ -28,13 +28,18 @@ jobs:
         run: python -m unittest neuroflow.tests.test_film_sheet -v
       - name: Build the desktop app
         run: python code/packaging/build_film_sheet.py
+      - name: Build console-enabled smoke executable
+        if: runner.os == 'Windows'
+        env:
+          NEUROFLOW_FILM_SHEET_SMOKE_BUILD: "1"
+        run: python code/packaging/build_film_sheet.py
       - name: Smoke test packaged PDF engine on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $resultFile = Join-Path $env:RUNNER_TEMP "neuroflow-film-sheet-engine-smoke.txt"
           Remove-Item $resultFile -ErrorAction SilentlyContinue
-          & "dist/film_sheet/NeuroFlowMRIFilmSheet/NeuroFlowMRIFilmSheet.exe" --engine-smoke-test --result-file $resultFile
+          & "build/film_sheet_smoke/dist/NeuroFlowMRIFilmSheetSmoke/NeuroFlowMRIFilmSheetSmoke.exe" --engine-smoke-test --result-file $resultFile
           $exitCode = $LASTEXITCODE
           if (Test-Path -PathType Leaf $resultFile) { Get-Content $resultFile }
           if ($exitCode -ne 0) { throw "Packaged PDF engine smoke test failed with exit code $exitCode." }

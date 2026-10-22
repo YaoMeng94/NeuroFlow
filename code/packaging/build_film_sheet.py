@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import plistlib
+import os
 import re
 import subprocess
 import sys
@@ -47,15 +48,19 @@ def _set_macos_bundle_version() -> None:
 
 
 def main() -> int:
+    smoke_build = os.environ.get("NEUROFLOW_FILM_SHEET_SMOKE_BUILD") == "1"
+    app_name = "NeuroFlowMRIFilmSheetSmoke" if smoke_build else "NeuroFlowMRIFilmSheet"
+    build_root = ROOT / "build" / ("film_sheet_smoke" if smoke_build else "film_sheet")
+    dist_root = build_root / "dist" if smoke_build else ROOT / "dist" / "film_sheet"
     command = [
         sys.executable, "-m", "PyInstaller",
-        "--noconfirm", "--clean", "--windowed", "--onedir",
-        "--name", "NeuroFlowMRIFilmSheet",
+        "--noconfirm", "--clean", "--console" if smoke_build else "--windowed", "--onedir",
+        "--name", app_name,
         "--osx-bundle-identifier", "org.neuroflow.mri-film-sheet",
         "--paths", str(ROOT / "code"),
-        "--specpath", str(ROOT / "build" / "film_sheet"),
-        "--workpath", str(ROOT / "build" / "film_sheet"),
-        "--distpath", str(ROOT / "dist" / "film_sheet"),
+        "--specpath", str(build_root),
+        "--workpath", str(build_root),
+        "--distpath", str(dist_root),
         "--collect-all", "pydicom",
         "--collect-all", "reportlab",
         "--collect-all", "PIL",
