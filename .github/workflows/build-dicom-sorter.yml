@@ -252,6 +252,7 @@ jobs:
             } catch {
               if ($_.Exception.Message -notmatch 'Offline NeuroFlow installation failed') { throw }
             }
+            $global:LASTEXITCODE = 0
             $neuroflowWheel = Get-ChildItem $failedWheelhouse -Filter 'neuroflow-*.whl' | Select-Object -First 1
             if (-not $neuroflowWheel) { throw 'Failed-install test bundle lost the NeuroFlow wheel.' }
             $failedVersion = $neuroflowWheel.BaseName -replace '^neuroflow-(.+)-py3-none-any$', '$1'

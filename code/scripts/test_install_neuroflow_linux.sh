@@ -6,11 +6,12 @@ WHEELHOUSE="${1:?Usage: test_install_neuroflow_linux.sh WHEELHOUSE}"
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/neuroflow-linux-install-test.XXXXXX")"
 trap 'rm -rf "$test_root"' EXIT
 
-HOME="$test_root/home" bash "$ROOT/code/scripts/install_neuroflow_linux.sh" \
+export HOME="$test_root/home"
+unset XDG_CONFIG_HOME
+bash "$ROOT/code/scripts/install_neuroflow_linux.sh" \
   --wheelhouse "$WHEELHOUSE" \
   --venv "$test_root/home/.venvs/neuroflow"
 
-export HOME="$test_root/home"
 "$test_root/home/.venvs/neuroflow/bin/python" - <<'PY'
 import json
 from pathlib import Path
