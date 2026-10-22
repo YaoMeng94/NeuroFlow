@@ -5,32 +5,31 @@ can optionally convert a sorted subject to BIDS. The scanner export stays
 unchanged. NeuroFlow's processing tools and external neuroimaging containers
 are installed separately.
 
-## Release status
+## Test artifact status
 
-- macOS arm64 0.4.11 is available for controlled internal testing at
-  `dist/standalone_sorter/NeuroFlowDICOMSorter-macOS-arm64-0.4.11.zip`.
-  Verify the adjacent `.zip.sha256` file and follow `INSTALL_MACOS.md`.
-- The macOS app is ad-hoc signed and not notarized. Do not distribute it
-  publicly.
-- The Windows installer and Intel macOS archive are not yet validated by
-  their native CI jobs. Do not redistribute older unversioned artifacts as
-  current releases.
+Native platform builds and smoke tests passed on commit `a1d9540` in Actions
+run `39707189090`. The run includes Linux and Windows controller bundles,
+Windows sorter installer, and macOS ARM64 and Intel sorter apps. These are
+temporary GitHub Actions artifacts, not a versioned GitHub Release. Do not
+redistribute them as stable public releases. The macOS apps are not notarized;
+follow the controlled internal-test steps in `INSTALL_MACOS.md`.
 
 ## Install and launch
 
 Use only a versioned, checksum-verified package for your operating system. No
 Python installation is needed to run a published standalone desktop package.
 
-- **macOS arm64:** use the versioned archive above and follow the checksum and
-  internal-test steps in `INSTALL_MACOS.md`.
-- **Windows:** wait for a versioned installer from a passing native Windows
-  CI run; no validated installer is currently available in this checkout.
+- **macOS:** download the ARM64 or X64 artifact from Actions run
+  `39707189090`, verify its checksum, and follow the internal-test steps in
+  `INSTALL_MACOS.md`.
+- **Windows:** download the Windows sorter artifact from Actions run
+  `39707189090`, verify its adjacent `.exe.sha256`, then run the installer.
+  The controller bundle and its installation steps are in `INSTALL_WINDOWS.md`.
 - **Linux desktop:** install the Linux/HPC NeuroFlow bundle. The
   `neuroflow-dicom-sorter` command is added when its Python has Tk support.
   Headless HPC sessions should use the browser sorter.
 
-When the Windows installer is available, download its adjacent `.exe.sha256`
-file and verify the executable in PowerShell before running it:
+Verify the Windows sorter executable in PowerShell before running it:
 
 ```powershell
 $installers = @(Get-ChildItem . -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe')

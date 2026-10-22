@@ -6,16 +6,17 @@ Python Launcher (`py.exe`). If these are not installed, install Python 3.11 x64
 from [python.org](https://www.python.org/downloads/windows/) and rerun the
 installer.
 
-The current source is 0.4.13; its Windows bundle has not yet been produced or
-tested on a Windows runner. Do not treat these instructions as a tested
-release until the native workflow has built the bundle and passed fresh
-install, reinstall, live UI, profile-preservation, and uninstall checks. The
-workflow also includes a failure-path check for a deliberately incomplete
-offline wheelhouse, but that check remains unverified until the Windows runner
-executes it.
+The Windows controller bundle was built and its native smoke tests passed on
+commit `a1d9540` (Actions run `39707189090`). The tests cover current-user
+installation, reinstall/profile preservation, live UI startup, and uninstall;
+the incomplete-wheelhouse failure path was also exercised. The standalone
+Windows DICOM sorter installer and app were built and tested in the same
+workflow. These are temporary Actions artifacts, not a versioned GitHub
+Release, so do not treat them as a stable public release.
 
-Once the native workflow publishes the versioned bundle and adjacent
-`.zip.sha256` file, verify the archive before extracting it:
+Download the `NeuroFlow-Windows-controller` artifact from Actions run
+`39707189090`. Verify the bundle archive and adjacent `.zip.sha256` file before
+extracting it:
 
 ```powershell
 $archives = @(Get-ChildItem . -Filter 'NeuroFlow-Windows-x86_64-cp311-*.zip')
