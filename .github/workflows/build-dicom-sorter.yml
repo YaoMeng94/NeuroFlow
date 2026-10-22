@@ -269,11 +269,13 @@ jobs:
           if (-not (Test-Path $startMenuShortcut)) { throw 'NeuroFlow Start Menu shortcut was not created' }
           $site = Join-Path $env:APPDATA 'NeuroFlow\site.json'
           $siteData = Get-Content $site -Raw | ConvertFrom-Json
-          Add-Member -InputObject $siteData -NotePropertyName deployment_test_marker -NotePropertyValue 'keep-on-reinstall' -Force
+          $preservedPipelineRoot = Join-Path $env:RUNNER_TEMP 'preserved-pipeline-root'
+          New-Item -ItemType Directory -Path $preservedPipelineRoot -Force | Out-Null
+          $siteData.pipeline_root = $preservedPipelineRoot
           $siteData | ConvertTo-Json -Depth 20 | Set-Content $site
           & (Join-Path $bundle.FullName 'install_neuroflow_windows.ps1')
           $siteData = Get-Content $site -Raw | ConvertFrom-Json
-          if ($siteData.deployment_test_marker -ne 'keep-on-reinstall') { throw 'Reinstall overwrote the user site profile' }
+          if ($siteData.pipeline_root -ne $preservedPipelineRoot) { throw 'Reinstall overwrote the user site profile' }
           $version = (Get-Content "$env:LOCALAPPDATA\NeuroFlow\current-version.txt" -Raw).Trim()
           $exe = "$env:LOCALAPPDATA\NeuroFlow\venvs\$version\Scripts\neuroflow.exe"
           $stdout = Join-Path $env:RUNNER_TEMP 'neuroflow-server.log'
@@ -311,7 +313,7 @@ jobs:
           if (Test-Path "$env:LOCALAPPDATA\NeuroFlow\venvs\$version") { throw 'Uninstaller left the versioned environment behind' }
           if (-not (Test-Path $site)) { throw 'Uninstaller removed user configuration' }
           $siteData = Get-Content $site -Raw | ConvertFrom-Json
-          if ($siteData.deployment_test_marker -ne 'keep-on-reinstall') { throw 'Uninstaller altered user configuration' }
+          if ($siteData.pipeline_root -ne $preservedPipelineRoot) { throw 'Uninstaller altered user configuration' }
           if (-not (Test-Path $jobMarker)) { throw 'Uninstaller removed job-state data' }
       - uses: actions/upload-artifact@v4
         with:
