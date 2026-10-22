@@ -3,6 +3,8 @@ name: Build NeuroFlow platform bundles
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "neuroflow-v*"
 
