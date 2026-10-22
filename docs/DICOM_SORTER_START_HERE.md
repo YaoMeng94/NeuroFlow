@@ -89,13 +89,20 @@ When **All subjects** is selected, participants are converted one at a time
 into the same BIDS output folder. Temporary staged DICOM files are removed
 after each participant completes.
 
-`dcm2bids` and `dcm2niix` must be installed and available on `PATH`. Review the
-mapping before conversion. The default config covers the observed anatomical,
+The macOS and Windows packages built from the updated source include
+`dcm2bids` 3.2.0,
+`dcm2bids_helper`, and `dcm2niix` 1.0.20260724. No separate converter install
+is needed. The existing 0.4.14 packages predate this change and still require
+both tools on `PATH`. Source-based launches can also use converter executables
+installed on `PATH`. Review the mapping before conversion. The default config
+covers the observed anatomical,
 multi-echo REST, diffusion, and spin-echo fieldmap acquisitions. Scouts,
 PhysioLog recordings, and presentation-state reconstructions are left out of
 BIDS for manual review. The converter writes NIfTI images and JSON sidecars,
 and the app adds `dataset_description.json` when needed. DICOM sorting works
 without these conversion tools.
+
+Third-party license notices for the bundled converters are included in the app.
 
 This prototype is intended for internal academic use. Do not send identifiable
 DICOM files unless your institution's data-sharing rules allow it.

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ENTRY_POINT = ROOT / "code" / "packaging" / "run_standalone.py"
 RULES = ROOT / "code" / "neuroflow" / "data" / "dicom_sort_rules_20261016.json"
 BIDS_CONFIG = ROOT / "code" / "neuroflow" / "data" / "dcm2bids_config_prisma.json"
+CONVERTER_TOOLS = ROOT / "build" / "converter-tools"
 
 
 def package_version() -> str:
@@ -48,6 +49,14 @@ def finalize_macos_bundle(version: str) -> None:
 
 
 def main() -> int:
+    suffix = ".exe" if sys.platform == "win32" else ""
+    bundled_tools = [
+        CONVERTER_TOOLS / f"{name}{suffix}"
+        for name in ("dcm2bids", "dcm2bids_helper", "dcm2bids_scaffold", "dcm2niix")
+    ]
+    bundled_tools.append(CONVERTER_TOOLS / "THIRD-PARTY-LICENSES.txt")
+    if not all(path.is_file() for path in bundled_tools):
+        subprocess.run([sys.executable, str(ROOT / "code" / "packaging" / "prepare_converter_tools.py")], cwd=ROOT, check=True)
     command = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--windowed", "--onedir",
@@ -65,8 +74,13 @@ def main() -> int:
         "--distpath", str(ROOT / "dist" / "standalone_sorter"),
         "--add-data", f"{RULES}{os.pathsep}neuroflow/data",
         "--add-data", f"{BIDS_CONFIG}{os.pathsep}neuroflow/data",
-        str(ENTRY_POINT),
     ]
+    for tool in sorted(CONVERTER_TOOLS.iterdir()):
+        if tool.is_file() and tool.name != "THIRD-PARTY-LICENSES.txt":
+            command.extend(["--add-binary", f"{tool}{os.pathsep}tools"])
+    licenses = CONVERTER_TOOLS / "THIRD-PARTY-LICENSES.txt"
+    command.extend(["--add-data", f"{licenses}{os.pathsep}licenses"])
+    command.append(str(ENTRY_POINT))
     result = subprocess.call(command, cwd=ROOT)
     if result != 0:
         return result

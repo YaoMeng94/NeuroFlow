@@ -51,6 +51,16 @@ def _bundled_preset() -> Path:
     return Path(str(files("neuroflow").joinpath("data", PRESET_NAME)))
 
 
+def _bundled_converter(name: str) -> Path | None:
+    """Return a converter shipped in the standalone bundle, if present."""
+    frozen_root = getattr(sys, "_MEIPASS", None)
+    if not frozen_root:
+        return None
+    suffix = ".exe" if sys.platform == "win32" else ""
+    candidate = Path(frozen_root) / "tools" / f"{name}{suffix}"
+    return candidate if candidate.is_file() else None
+
+
 def _install_user_preset() -> Path:
     destination = _user_config_dir() / PRESET_NAME
     if not destination.exists():
@@ -160,7 +170,7 @@ class SorterWindow:
         bids.pack(fill="x", pady=(8, 0))
         ttk.Label(
             bids,
-            text="The included Prisma config maps tested anatomy, multi-echo REST, diffusion, and fieldmap series. Review it before conversion. dcm2bids and dcm2niix must be installed on this computer.",
+            text="The included Prisma config maps tested anatomy, multi-echo REST, diffusion, and fieldmap series. Review it before conversion. The standalone app includes dcm2bids and dcm2niix.",
             wraplength=980,
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
         self._path_row(bids, "BIDS output folder", self.bids_output_var, self._choose_bids_output, 1)
@@ -450,11 +460,19 @@ class SorterWindow:
         if not config_text or not Path(config_text).expanduser().is_file():
             messagebox.showerror(APP_NAME, "Choose a dcm2bids JSON config that maps your sequences to BIDS.", parent=self.root)
             return
-        executable = shutil.which("dcm2bids")
+        executable = _bundled_converter("dcm2bids") or shutil.which("dcm2bids")
+        dcm2niix = _bundled_converter("dcm2niix") or shutil.which("dcm2niix")
         if executable is None:
             messagebox.showerror(
                 APP_NAME,
-                "dcm2bids was not found. Install dcm2bids and dcm2niix, then restart the app so they are available on PATH.",
+                "dcm2bids was not found in the app or on PATH. Reinstall the app, or install dcm2bids and dcm2niix, then relaunch it.",
+                parent=self.root,
+            )
+            return
+        if dcm2niix is None:
+            messagebox.showerror(
+                APP_NAME,
+                "The bundled dcm2niix tool is missing. Reinstall the app, or install dcm2niix on PATH.",
                 parent=self.root,
             )
             return
@@ -483,6 +501,13 @@ class SorterWindow:
         def convert() -> str:
             config = json.loads(Path(config_text).expanduser().read_text(encoding="utf-8"))
             output.parent.mkdir(parents=True, exist_ok=True)
+            env = os.environ.copy()
+            tool_dirs = []
+            for tool in (executable, dcm2niix):
+                parent = str(Path(tool).parent)
+                if parent not in tool_dirs:
+                    tool_dirs.append(parent)
+            env["PATH"] = os.pathsep.join([*tool_dirs, env.get("PATH", "")])
             for index, (label, participant) in enumerate(participants, 1):
                 self.events.put(("progress", f"Converting {label} to BIDS ({index} of {len(participants)})…"))
                 subject_source = sorted_root / label
@@ -500,7 +525,7 @@ class SorterWindow:
                                "-c", str(Path(config_text).expanduser()), "-o", str(output)]
                     if session:
                         command.extend(["-s", session])
-                    result = subprocess.run(command, capture_output=True, text=True)
+                    result = subprocess.run(command, capture_output=True, text=True, env=env)
                     if result.returncode:
                         details = (result.stderr or result.stdout or "No converter details were returned").strip()
                         raise RuntimeError(
@@ -584,6 +609,15 @@ def self_test() -> None:
         config = json.load(stream)
     if not isinstance(config, dict):
         raise ValueError(f"Bundled BIDS config is not a JSON object: {config_path}")
+    if getattr(sys, "_MEIPASS", None):
+        bundled_tools = ("dcm2bids", "dcm2bids_helper", "dcm2bids_scaffold", "dcm2niix")
+        missing = [name for name in bundled_tools if _bundled_converter(name) is None]
+        if missing:
+            raise RuntimeError("Standalone package is missing converter tool(s): " + ", ".join(missing))
+        env = os.environ.copy()
+        env["PATH"] = str(Path(sys._MEIPASS) / "tools") + os.pathsep + env.get("PATH", "")
+        subprocess.run([str(_bundled_converter("dcm2bids")), "--version"], capture_output=True, text=True, env=env, check=True)
+        subprocess.run([str(_bundled_converter("dcm2niix")), "-h"], capture_output=True, text=True, env=env, check=True)
     print(f"{APP_NAME} {__version__}: resources and DICOM sorter imports are ready ({len(rules['rules'])} rules)")
 
 
