@@ -8,7 +8,7 @@ tedana, QSIPrep, QSIRecon, Workbench, or Apptainer images.
 ## Current distribution status
 
 Native GitHub Actions packaging passed for both macOS architectures on commit
-`a1d9540` (run `39707189090`): the ARM64 and Intel sorter app archives were
+`bdb6750` (run `39710399285`): the ARM64 and Intel sorter app archives were
 built, checksummed, and passed their packaged self-tests and GUI startup checks.
 Download the `NeuroFlowDICOMSorter-macOS-ARM64` or
 `NeuroFlowDICOMSorter-macOS-X64` artifact from that workflow run. These are
@@ -27,7 +27,7 @@ metadata and is not a release artifact.
 ## Internal test steps
 
 1. Download one of the macOS sorter artifacts from Actions run
-   `39707189090` and locate the packaged `.zip` and adjacent `.zip.sha256` file.
+   `39710399285` and locate the packaged `.zip` and adjacent `.zip.sha256` file.
    Do not use this archive for public distribution.
 2. Verify the archive checksum before opening it:
 

@@ -7,7 +7,7 @@ from [python.org](https://www.python.org/downloads/windows/) and rerun the
 installer.
 
 The Windows controller bundle was built and its native smoke tests passed on
-commit `a1d9540` (Actions run `39707189090`). The tests cover current-user
+commit `bdb6750` (Actions run `39710399285`). The tests cover current-user
 installation, reinstall/profile preservation, live UI startup, and uninstall;
 the incomplete-wheelhouse failure path was also exercised. The standalone
 Windows DICOM sorter installer and app were built and tested in the same
@@ -15,7 +15,7 @@ workflow. These are temporary Actions artifacts, not a versioned GitHub
 Release, so do not treat them as a stable public release.
 
 Download the `NeuroFlow-Windows-controller` artifact from Actions run
-`39707189090`. Verify the bundle archive and adjacent `.zip.sha256` file before
+`39710399285`. Verify the bundle archive and adjacent `.zip.sha256` file before
 extracting it:
 
 ```powershell

@@ -7,12 +7,14 @@ are installed separately.
 
 ## Test artifact status
 
-Native platform builds and smoke tests passed on commit `a1d9540` in Actions
-run `39707189090`. The run includes Linux and Windows controller bundles,
-Windows sorter installer, and macOS ARM64 and Intel sorter apps. These are
-temporary GitHub Actions artifacts, not a versioned GitHub Release. Do not
-redistribute them as stable public releases. The macOS apps are not notarized;
-follow the controlled internal-test steps in `INSTALL_MACOS.md`.
+Native platform builds and smoke tests passed on commit `bdb6750` in Actions
+run `39710399285`. The run includes Linux and Windows controller bundles, a
+Windows sorter installer, and macOS ARM64 and Intel sorter apps. The Linux
+controller install, upgrade, uninstall, glibc 2.17, sorter GUI, and unit/web
+tests passed in run `39710399249`. These are temporary GitHub Actions
+artifacts, not a versioned GitHub Release. Do not redistribute them as stable
+public releases. The macOS apps are not notarized; follow the controlled
+internal-test steps in `INSTALL_MACOS.md`.
 
 ## Install and launch
 
@@ -20,10 +22,10 @@ Use only a versioned, checksum-verified package for your operating system. No
 Python installation is needed to run a published standalone desktop package.
 
 - **macOS:** download the ARM64 or X64 artifact from Actions run
-  `39707189090`, verify its checksum, and follow the internal-test steps in
+  `39710399285`, verify its checksum, and follow the internal-test steps in
   `INSTALL_MACOS.md`.
 - **Windows:** download the Windows sorter artifact from Actions run
-  `39707189090`, verify its adjacent `.exe.sha256`, then run the installer.
+  `39710399285`, verify its adjacent `.exe.sha256`, then run the installer.
   The controller bundle and its installation steps are in `INSTALL_WINDOWS.md`.
 - **Linux desktop:** install the Linux/HPC NeuroFlow bundle. The
   `neuroflow-dicom-sorter` command is added when its Python has Tk support.
