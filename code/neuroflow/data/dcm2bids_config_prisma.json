@@ -6,7 +6,14 @@
       "suffix": "T1w",
       "criteria": {
         "SeriesDescription": "3dT1w_mpr_sag_1mm",
-        "ProtocolName": "3dT1w_mpr_sag_1mm"
+        "ProtocolName": "3dT1w_mpr_sag_1mm",
+        "ImageTypeText": [
+          "ORIGINAL",
+          "PRIMARY",
+          "M",
+          "NORM",
+          "DIS2D"
+        ]
       }
     },
     {
@@ -15,7 +22,14 @@
       "custom_entities": "acq-0p8mm",
       "criteria": {
         "SeriesDescription": "3dT2w_spc_sag_0.8mm",
-        "ProtocolName": "3dT2w_spc_sag_0.8mm"
+        "ProtocolName": "3dT2w_spc_sag_0.8mm",
+        "ImageTypeText": [
+          "ORIGINAL",
+          "PRIMARY",
+          "M",
+          "NORM",
+          "DIS2D"
+        ]
       }
     },
     {
@@ -24,7 +38,14 @@
       "custom_entities": "acq-1mm",
       "criteria": {
         "SeriesDescription": "3dT2w_spc_sag_1mm",
-        "ProtocolName": "3dT2w_spc_sag_1mm"
+        "ProtocolName": "3dT2w_spc_sag_1mm",
+        "ImageTypeText": [
+          "ORIGINAL",
+          "PRIMARY",
+          "M",
+          "NORM",
+          "DIS2D"
+        ]
       }
     },
     {
@@ -64,7 +85,6 @@
       }
     },
     {
-      "id": "dwi_dir98",
       "datatype": "dwi",
       "suffix": "dwi",
       "custom_entities": "acq-dir98_dir-AP",
@@ -83,7 +103,6 @@
       }
     },
     {
-      "id": "dwi_dir99",
       "datatype": "dwi",
       "suffix": "dwi",
       "custom_entities": "acq-dir99_dir-AP",
@@ -102,29 +121,21 @@
       }
     },
     {
-      "id": "fmap_b0_dir98",
-      "datatype": "fmap",
-      "suffix": "epi",
-      "custom_entities": "acq-dir98_dir-PA",
+      "datatype": "dwi",
+      "suffix": "dwi",
+      "custom_entities": "acq-dir98b0_dir-PA",
       "criteria": {
-        "SeriesDescription": "mbep2d_diff_dir98b0_1.5mm_PA",
+        "SeriesDescription": "mbep2d_diff_dir98b0_1.5mm_PA_SBRef",
         "ProtocolName": "mbep2d_diff_dir98b0_1.5mm_PA"
-      },
-      "sidecar_changes": {
-        "IntendedFor": "dwi_dir98"
       }
     },
     {
-      "id": "fmap_b0_dir99",
-      "datatype": "fmap",
-      "suffix": "epi",
-      "custom_entities": "acq-dir99_dir-PA",
+      "datatype": "dwi",
+      "suffix": "dwi",
+      "custom_entities": "acq-dir99b0_dir-PA",
       "criteria": {
-        "SeriesDescription": "mbep2d_diff_dir99b0_1.5mm_PA",
+        "SeriesDescription": "mbep2d_diff_dir99b0_1.5mm_PA_SBRef",
         "ProtocolName": "mbep2d_diff_dir99b0_1.5mm_PA"
-      },
-      "sidecar_changes": {
-        "IntendedFor": "dwi_dir99"
       }
     },
     {
@@ -132,140 +143,220 @@
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-1_echo-1",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm", "EchoNumber": 1},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 1
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest1_echo2",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-1_echo-2",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm", "EchoNumber": 2},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 2
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest1_echo3",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-1_echo-3",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm", "EchoNumber": 3},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 3
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest1_echo4",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-1_echo-4",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm", "EchoNumber": 4},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 4
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest1_echo5",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-1_echo-5",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm", "EchoNumber": 5},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 5
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest2_echo1",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-2_echo-1",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm", "EchoNumber": 1},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 1
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest2_echo2",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-2_echo-2",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm", "EchoNumber": 2},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 2
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest2_echo3",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-2_echo-3",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm", "EchoNumber": 3},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 3
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest2_echo4",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-2_echo-4",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm", "EchoNumber": 4},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 4
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "id": "bold_rest2_echo5",
       "datatype": "func",
       "suffix": "bold",
       "custom_entities": "task-rest_run-2_echo-5",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm", "EchoNumber": 5},
-      "sidecar_changes": {"TaskName": "rest"}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        "EchoNumber": 5
+      },
+      "sidecar_changes": {
+        "TaskName": "rest"
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-1_echo-1",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 1}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 1
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-1_echo-2",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 2}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 2
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-1_echo-3",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 3}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 3
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-1_echo-4",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 4}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 4
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-1_echo-5",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 5}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST1_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 5
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-2_echo-1",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 1}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 1
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-2_echo-2",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 2}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 2
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-2_echo-3",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 3}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 3
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-2_echo-4",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 4}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 4
+      }
     },
     {
       "datatype": "func",
       "suffix": "sbref",
       "custom_entities": "task-rest_run-2_echo-5",
-      "criteria": {"SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef", "EchoNumber": 5}
+      "criteria": {
+        "SeriesDescription": "mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_SBRef",
+        "EchoNumber": 5
+      }
     },
     {
       "id": "fmap_rest_ap",
@@ -278,8 +369,16 @@
       },
       "sidecar_changes": {
         "IntendedFor": [
-          "bold_rest1_echo1", "bold_rest1_echo2", "bold_rest1_echo3", "bold_rest1_echo4", "bold_rest1_echo5",
-          "bold_rest2_echo1", "bold_rest2_echo2", "bold_rest2_echo3", "bold_rest2_echo4", "bold_rest2_echo5"
+          "bold_rest1_echo1",
+          "bold_rest1_echo2",
+          "bold_rest1_echo3",
+          "bold_rest1_echo4",
+          "bold_rest1_echo5",
+          "bold_rest2_echo1",
+          "bold_rest2_echo2",
+          "bold_rest2_echo3",
+          "bold_rest2_echo4",
+          "bold_rest2_echo5"
         ]
       }
     },
@@ -294,8 +393,16 @@
       },
       "sidecar_changes": {
         "IntendedFor": [
-          "bold_rest1_echo1", "bold_rest1_echo2", "bold_rest1_echo3", "bold_rest1_echo4", "bold_rest1_echo5",
-          "bold_rest2_echo1", "bold_rest2_echo2", "bold_rest2_echo3", "bold_rest2_echo4", "bold_rest2_echo5"
+          "bold_rest1_echo1",
+          "bold_rest1_echo2",
+          "bold_rest1_echo3",
+          "bold_rest1_echo4",
+          "bold_rest1_echo5",
+          "bold_rest2_echo1",
+          "bold_rest2_echo2",
+          "bold_rest2_echo3",
+          "bold_rest2_echo4",
+          "bold_rest2_echo5"
         ]
       }
     }

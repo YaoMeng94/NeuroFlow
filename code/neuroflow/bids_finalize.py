@@ -53,7 +53,13 @@ def finalize_bids(output: Path, participant: str, session: str, config: dict[str
         if identifier:
             targets = _target_files(subject_root, description)
             if not targets:
-                raise ValueError(f"No BIDS files found for mapping ID {identifier!r}")
+                # Sequence sets vary between participants. An ID is only
+                # required when an existing fieldmap actually refers to it.
+                print(
+                    f"Skipping optional mapping ID {identifier!r}: no matching BIDS files for this participant.",
+                    flush=True,
+                )
+                continue
             identifiers[identifier] = targets
 
     for description in config.get("descriptions", []):
@@ -61,14 +67,23 @@ def finalize_bids(output: Path, participant: str, session: str, config: dict[str
             continue
         fieldmaps = _target_files(subject_root, description)
         if not fieldmaps:
-            raise ValueError(f"No fieldmap sidecar found for mapping ID {description.get('id')!r}")
+            print(
+                f"Skipping optional fieldmap mapping ID {description.get('id')!r}: "
+                "no matching fieldmap files for this participant.",
+                flush=True,
+            )
+            continue
         intended = description["sidecar_changes"]["IntendedFor"]
         if isinstance(intended, str):
             intended = [intended]
         paths = []
         for identifier in intended:
             if identifier not in identifiers:
-                raise ValueError(f"Unresolved IntendedFor mapping ID: {identifier}")
+                print(
+                    f"Skipping unavailable IntendedFor target {identifier!r} for this participant.",
+                    flush=True,
+                )
+                continue
             participant_root = output / f"sub-{participant}"
             paths.extend(
                 target.relative_to(participant_root).as_posix().replace(".json", ".nii.gz")
@@ -76,7 +91,10 @@ def finalize_bids(output: Path, participant: str, session: str, config: dict[str
             )
         for fieldmap_json in fieldmaps:
             metadata = json.loads(fieldmap_json.read_text())
-            metadata["IntendedFor"] = paths
+            if paths:
+                metadata["IntendedFor"] = paths
+            else:
+                metadata.pop("IntendedFor", None)
             fieldmap_json.write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n")
 
     for datatype, suffix in (("fmap", "epi"), ("dwi", "sbref")):
