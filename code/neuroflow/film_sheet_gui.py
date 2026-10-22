@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import traceback
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -735,7 +736,13 @@ def main() -> int:
     if sys.argv[1:3] == ["--smoke-test", "--result-file"] and len(sys.argv) == 4:
         return _smoke_test(Path(sys.argv[3]))
     if sys.argv[1:3] == ["--engine-smoke-test", "--result-file"] and len(sys.argv) == 4:
-        return _engine_smoke_test(Path(sys.argv[3]))
+        result_file = Path(sys.argv[3])
+        try:
+            return _engine_smoke_test(result_file)
+        except Exception:
+            result_file.parent.mkdir(parents=True, exist_ok=True)
+            result_file.write_text(traceback.format_exc(), encoding="utf-8")
+            return 1
     root = tk.Tk()
     FilmSheetWindow(root)
     root.mainloop()
