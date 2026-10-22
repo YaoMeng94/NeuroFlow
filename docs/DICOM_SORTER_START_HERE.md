@@ -24,11 +24,11 @@ Use only a versioned, checksum-verified package for your operating system. No
 Python installation is needed to run a published standalone desktop package.
 
 - **macOS:** download the ARM64 or X64 artifact from the
-  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14),
+  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01),
   verify its checksum, and follow the internal-test steps in
   `INSTALL_MACOS.md`.
 - **Windows:** download the Windows sorter installer from the
-  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14),
+  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01),
   verify its adjacent `.exe.sha256`, then run the installer.
   The controller bundle and its installation steps are in `INSTALL_WINDOWS.md`.
 - **Linux desktop:** install the Linux/HPC NeuroFlow bundle. The

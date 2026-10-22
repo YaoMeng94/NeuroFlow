@@ -12,12 +12,12 @@ run `39713726327`). Controller tests cover current-user installation,
 reinstall/profile preservation, live UI startup, uninstall, and an
 incomplete-wheelhouse failure path. The versioned packages and SHA-256 files
 are available in the unpublished
-[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
+[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01)
 for controlled internal testing. The earlier `neuroflow-v0.4.13` draft is
 tied to a previous source commit and remains unchanged.
 
 Download the `NeuroFlow-Windows-controller` archive from the
-[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14).
+[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01).
 Verify the bundle archive and adjacent `.zip.sha256` file before
 extracting it:
 

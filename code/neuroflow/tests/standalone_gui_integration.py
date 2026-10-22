@@ -164,8 +164,10 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
                 with patch("neuroflow.standalone_gui.shutil.which", return_value=None), \
                      patch("neuroflow.standalone_gui.messagebox.showerror") as showerror:
                     window._convert_bids()
-                self.assertIn("dcm2bids was not found", showerror.call_args.args[1])
-                self.assertIn("dcm2niix", showerror.call_args.args[1])
+                message = showerror.call_args.args[1]
+                self.assertIn("dcm2bids was not found in the app or on PATH", message)
+                self.assertIn("Reinstall the app", message)
+                self.assertIn("install dcm2bids and dcm2niix", message)
             finally:
                 root.destroy()
 

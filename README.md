@@ -109,9 +109,12 @@ upgrade, uninstall, glibc 2.17, sorter GUI, synthetic DICOM-to-BIDS, and
 unit/web checks in [Actions test run 39713726335](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726335).
 Native Windows and macOS builds, installer smoke tests, and Linux/HPC bundle
 checks passed in [Actions build run 39713726327](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726327).
-Both workflows ran on the versioned tag. The [0.4.14 GitHub Release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
+Both workflows ran on the versioned tag. The [0.4.14 GitHub Release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01)
 is an unpublished draft containing versioned platform bundles and checksums;
-it is for controlled internal testing, not public distribution. The older
+it is for controlled internal testing, not public distribution. GitHub serves
+this draft at its generated `untagged-<release-id>` URL; if it is published,
+update the installation guides to use the canonical `neuroflow-v0.4.14`
+release URL. The older
 `neuroflow-v0.4.13` draft remains unchanged and is tied to `edb38b1`. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific test guidance. Public

@@ -3,6 +3,7 @@ import unittest
 import re
 import json
 import html
+import hashlib
 import sys
 import time
 from pathlib import Path
@@ -14,6 +15,29 @@ except (ImportError, RuntimeError):
 
 from neuroflow.core import JobSpec, Plan, SiteProfile
 from neuroflow.jobs import JobStore
+
+
+def write_sorter_dicom(path: Path, series_number: int, description: str, protocol: str) -> None:
+    from pydicom import FileDataset, FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
+
+    sop_uid = generate_uid()
+    file_meta = FileMetaDataset()
+    file_meta.MediaStorageSOPClassUID = MRImageStorage
+    file_meta.MediaStorageSOPInstanceUID = sop_uid
+    file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    file_meta.ImplementationClassUID = generate_uid()
+    dataset = FileDataset(str(path), {}, file_meta=file_meta, preamble=b"\0" * 128)
+    dataset.SOPClassUID = MRImageStorage
+    dataset.SOPInstanceUID = sop_uid
+    dataset.PatientID = "TEST01"
+    dataset.StudyInstanceUID = "1.2.826.0.1.3680043.10.543.1"
+    dataset.SeriesInstanceUID = f"1.2.826.0.1.3680043.10.543.{series_number}"
+    dataset.SeriesNumber = series_number
+    dataset.SeriesDescription = description
+    dataset.ProtocolName = protocol
+    dataset.Modality = "MR"
+    dataset.save_as(path, enforce_file_format=True)
 
 
 @unittest.skipUnless(TestClient, "web dependencies not installed")
@@ -104,6 +128,80 @@ class WebTests(unittest.TestCase):
             self.assertIn("leave blank to skip surface reconstruction in fMRIPrep", home.text)
             self.assertEqual(client.get("/inventory").status_code, 200)
             self.assertEqual(client.post("/plan", data={}).status_code, 403)
+
+    def test_browser_sort_preview_requires_review_and_copies_source_unchanged(self):
+        from neuroflow.web import make_app
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "scanner"
+            source.mkdir()
+            write_sorter_dicom(source / "ambiguous.dcm", 1, "T1w", "MPRAGE")
+            write_sorter_dicom(source / "matched.dcm", 2, "T2w", "SPACE")
+            write_sorter_dicom(source / "unmatched.dcm", 3, "Localizer", "Scout")
+            source_hashes = {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in source.glob("*.dcm")
+            }
+            output = root / "sorted"
+            rules = root / "rules.json"
+            rules.write_text(json.dumps({
+                "version": 1,
+                "rules": [{
+                    "name": "T1 anatomy",
+                    "category": "anat",
+                    "match": {"SeriesDescription": "^T1w$"},
+                }, {
+                    "name": "T1 protocol",
+                    "category": "anat",
+                    "match": {"ProtocolName": "^MPRAGE$"},
+                }, {
+                    "name": "T2 anatomy",
+                    "category": "anat",
+                    "match": {"SeriesDescription": "^T2w$"},
+                }],
+            }))
+            client = TestClient(make_app(
+                SiteProfile(pipeline_root=temp), JobStore(root / "jobs"),
+            ))
+            page = client.get("/sort")
+            self.assertEqual(page.status_code, 200)
+            csrf = re.search(r'name="csrf" value="([^\"]+)"', page.text).group(1)
+            form = {
+                "csrf": csrf,
+                "source": str(source),
+                "output": str(output),
+                "rules": str(rules),
+            }
+
+            preview = client.post("/sort/preview", data=form)
+            self.assertEqual(preview.status_code, 200)
+            self.assertIn("ambiguous", preview.text)
+            self.assertIn("matched", preview.text)
+            self.assertIn("unmatched", preview.text)
+            self.assertIn("I reviewed the unmatched and ambiguous series", preview.text)
+            self.assertFalse(output.exists())
+
+            refused = client.post("/sort/apply", data=form)
+            self.assertEqual(refused.status_code, 200)
+            self.assertIn("Review unmatched and ambiguous series", refused.text)
+            self.assertFalse(output.exists())
+
+            copied = client.post("/sort/apply", data={**form, "reviewed": "yes"})
+            self.assertEqual(copied.status_code, 200)
+            self.assertIn("source DICOM files were left unchanged", copied.text)
+            copied_files = list(output.rglob("*.dcm"))
+            self.assertEqual(len(copied_files), 3)
+            self.assertTrue(any("_review_multiple_matches" in path.parts for path in copied_files))
+            self.assertTrue(any("_unmatched" in path.parts for path in copied_files))
+            self.assertEqual({
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in source.glob("*.dcm")
+            }, source_hashes)
+            self.assertEqual({
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in copied_files
+            }, source_hashes)
 
     def test_dicom_inventory_plan_does_not_require_subject_label(self):
         from neuroflow.web import make_app

@@ -108,27 +108,65 @@ jobs:
           }
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" code/packaging/windows/NeuroFlowDICOMSorter.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup exited with $LASTEXITCODE" }
-      - name: Install, self-test, and uninstall the Windows package
+      - name: Install prior version, upgrade, self-test, and uninstall the Windows package
         if: runner.os == 'Windows'
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
           if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
           $installer = $installer.FullName
           $installDir = Join-Path $env:RUNNER_TEMP 'NeuroFlowSorterTest'
-          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
-          if ($install.ExitCode -ne 0) { throw "Installer exited with $($install.ExitCode)" }
+          $previousVersion = '0.4.13'
+          $previousTag = "neuroflow-v$previousVersion"
+          $previousAssetName = "NeuroFlowDICOMSorter-Windows-Setup-$previousVersion.exe"
+          $previousChecksumName = "$previousAssetName.sha256"
+          $headers = @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/YaoMeng94/NeuroFlow/releases/tags/$previousTag" -Headers $headers
+          $previousAsset = $release.assets | Where-Object name -eq $previousAssetName | Select-Object -First 1
+          if (-not $previousAsset) { throw "Previous-version installer $previousAssetName is missing from $previousTag" }
+          $previousChecksumAsset = $release.assets | Where-Object name -eq $previousChecksumName | Select-Object -First 1
+          if (-not $previousChecksumAsset) { throw "Checksum $previousChecksumName is missing from $previousTag" }
+          $previousInstaller = Join-Path $env:RUNNER_TEMP $previousAssetName
+          $previousChecksum = "$previousInstaller.sha256"
+          Invoke-WebRequest -Uri $previousAsset.url -Headers @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          } -OutFile $previousInstaller
+          Invoke-WebRequest -Uri $previousChecksumAsset.url -Headers @{
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+            Accept = 'application/octet-stream'
+            'X-GitHub-Api-Version' = '2022-11-28'
+          } -OutFile $previousChecksum
+          $checksumLine = (Get-Content -LiteralPath $previousChecksum -Raw).Trim()
+          $checksumPattern = '^([A-Fa-f0-9]{64})\s+\*?' + [regex]::Escape($previousAssetName) + '$'
+          if ($checksumLine -match $checksumPattern) {
+            $expectedHash = $Matches[1].ToLowerInvariant()
+          } else {
+            throw "Invalid checksum manifest for $previousAssetName"
+          }
+          $downloadedHash = (Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($downloadedHash -ne $expectedHash) { throw "Checksum verification failed for $previousAssetName" }
+          $installPrevious = Start-Process -FilePath $previousInstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
+          if ($installPrevious.ExitCode -ne 0) { throw "Previous-version installer exited with $($installPrevious.ExitCode)" }
           $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
-          if (-not (Test-Path $app)) { throw 'Installed sorter executable is missing' }
+          if (-not (Test-Path $app)) { throw 'Previous-version sorter executable is missing' }
+          $previousHash = (Get-FileHash $app -Algorithm SHA256).Hash
           $selfTest = Start-Process -FilePath $app -ArgumentList '--self-test' -Wait -PassThru `
-            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'sorter-self-test.log')
-          Get-Content (Join-Path $env:RUNNER_TEMP 'sorter-self-test.log')
-          if ($selfTest.ExitCode -ne 0) { throw "Installed sorter self-test exited with $($selfTest.ExitCode)" }
+            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'sorter-previous-self-test.log')
+          Get-Content (Join-Path $env:RUNNER_TEMP 'sorter-previous-self-test.log')
+          if ($selfTest.ExitCode -ne 0) { throw "Previous-version sorter self-test exited with $($selfTest.ExitCode)" }
           $gui = Start-Process -FilePath $app -PassThru
           try {
             Start-Sleep -Seconds 5
-            if ($gui.HasExited) { throw 'Installed sorter exited during its first GUI launch.' }
+            if ($gui.HasExited) { throw 'Previous-version sorter exited during its first GUI launch.' }
           } finally {
             if (-not $gui.HasExited) { Stop-Process -Id $gui.Id -Force }
           }
@@ -136,6 +174,23 @@ jobs:
           New-Item -ItemType Directory -Path $profile -Force | Out-Null
           $profileMarker = Join-Path $profile 'deployment-test-marker'
           Set-Content -Path $profileMarker -Value 'preserve' -Encoding ascii
+          $upgrade = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
+          if ($upgrade.ExitCode -ne 0) { throw "Upgrade installer exited with $($upgrade.ExitCode)" }
+          if (-not (Test-Path $app)) { throw 'Sorter executable is missing after upgrade' }
+          if (-not (Test-Path $profileMarker)) { throw 'Sorter upgrade removed user profile data' }
+          $upgradedHash = (Get-FileHash $app -Algorithm SHA256).Hash
+          if ($upgradedHash -eq $previousHash) { throw 'Upgrade left the previous-version executable unchanged' }
+          $upgradeTest = Start-Process -FilePath $app -ArgumentList '--self-test' -Wait -PassThru `
+            -RedirectStandardOutput (Join-Path $env:RUNNER_TEMP 'sorter-upgrade-self-test.log')
+          Get-Content (Join-Path $env:RUNNER_TEMP 'sorter-upgrade-self-test.log')
+          if ($upgradeTest.ExitCode -ne 0) { throw "Upgraded sorter self-test exited with $($upgradeTest.ExitCode)" }
+          $upgradedGui = Start-Process -FilePath $app -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            if ($upgradedGui.HasExited) { throw 'Upgraded sorter exited during its first GUI launch.' }
+          } finally {
+            if (-not $upgradedGui.HasExited) { Stop-Process -Id $upgradedGui.Id -Force }
+          }
           $uninstaller = Join-Path $installDir 'unins000.exe'
           $remove = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru
           if ($remove.ExitCode -ne 0) { throw "Uninstaller exited with $($remove.ExitCode)" }

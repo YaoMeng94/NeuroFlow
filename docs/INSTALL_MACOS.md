@@ -12,7 +12,7 @@ Native GitHub Actions packaging passed for both macOS architectures on the
 Intel app archives were built, checksummed, and passed packaged self-tests and
 GUI startup checks. Download `NeuroFlowDICOMSorter-macOS-ARM64-0.4.14.zip` or
 `NeuroFlowDICOMSorter-macOS-X64-0.4.14.zip` from the
-[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14).
+[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01).
 The draft is unpublished and for controlled internal testing only.
 
 The apps are **not notarized**. No valid code-signing identity was available on
@@ -27,7 +27,7 @@ metadata and is not a release artifact.
 ## Internal test steps
 
 1. Download one of the macOS sorter artifacts from the
-   [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
+   [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01)
    and locate the matching `.zip` and adjacent `.zip.sha256` file. Do not use
    this archive for public distribution.
 2. Verify the archive checksum before opening it:

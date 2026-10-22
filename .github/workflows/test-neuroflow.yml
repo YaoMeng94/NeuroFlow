@@ -69,13 +69,13 @@ jobs:
               python3 -m venv /tmp/neuroflow-glibc217-test
               /tmp/neuroflow-glibc217-test/bin/pip install --no-index --find-links /wheelhouse "neuroflow[test]"
               PYTHONPATH=/src/code /tmp/neuroflow-glibc217-test/bin/python -m unittest \
-                neuroflow.tests.test_dicom_sort -v
+                neuroflow.tests.test_dicom_sort neuroflow.tests.test_web -v
             '
       - name: Install DICOM conversion tools for the synthetic integration test
         run: |
           sudo apt-get update
           sudo apt-get install -y dcm2niix
-          "$RUNNER_TEMP/neuroflow-test-env/bin/pip" install "dcm2bids==3.3.1"
+          "$RUNNER_TEMP/neuroflow-test-env/bin/pip" install "dcm2bids==3.2.0"
       - name: Run unit and web tests from the installed package
         run: |
           cd "$RUNNER_TEMP"
