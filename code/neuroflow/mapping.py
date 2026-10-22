@@ -67,10 +67,11 @@ def build_mapping(
         criteria: dict[str, Any] = {"SeriesNumber": row["SeriesNumber"]}
         if row.get("AcquisitionTime"):
             criteria["AcquisitionTime"] = row["AcquisitionTime"]
-        elif row.get("source_group") not in (None, "unresolved"):
-            raise PlanError(
-                f"Series {row.get('SeriesNumber')} lacks AcquisitionTime; cannot safely map it across study groups"
-            )
+        # Conversion stages only the manifest-verified selected study, so the
+        # study boundary disambiguates identical series numbers across exports.
+        # SeriesDescription further narrows matches when dcm2niix provides it.
+        if row.get("SeriesDescription"):
+            criteria["SeriesDescription"] = row["SeriesDescription"]
         if "EchoNumber" in row:
             criteria["EchoNumber"] = row["EchoNumber"]
         description: dict[str, Any] = {"datatype": datatype, "suffix": suffix, "criteria": criteria}

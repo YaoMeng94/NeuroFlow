@@ -296,7 +296,7 @@ class PlanningTests(unittest.TestCase):
         with self.assertRaisesRegex(PlanError, "unknown"):
             build_mapping(rows, fields)
 
-    def test_manual_mapping_uses_acquisition_time_to_disambiguate_repeated_series(self):
+    def test_manual_mapping_uses_available_metadata_and_selected_study_scope(self):
         rows = [
             {"SeriesNumber": 10, "AcquisitionTime": "09:00:00", "EchoNumber": 1},
             {"SeriesNumber": 10, "AcquisitionTime": "10:30:00", "EchoNumber": 1},
@@ -310,10 +310,12 @@ class PlanningTests(unittest.TestCase):
             [item["criteria"]["AcquisitionTime"] for item in config["descriptions"]],
             ["09:00:00", "10:30:00"],
         )
-        with self.assertRaisesRegex(PlanError, "lacks AcquisitionTime"):
-            build_mapping([{"SeriesNumber": 10, "source_group": "20261012085647"}], {
-                "row_0_datatype": "anat", "row_0_suffix": "T1w",
-            })
+        scoped = build_mapping([{
+            "SeriesNumber": 10, "SeriesDescription": "T1w", "source_group": "study-01",
+        }], {"row_0_datatype": "anat", "row_0_suffix": "T1w"})
+        self.assertEqual(scoped["descriptions"][0]["criteria"], {
+            "SeriesNumber": 10, "SeriesDescription": "T1w",
+        })
 
 
 if __name__ == "__main__":

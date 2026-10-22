@@ -71,9 +71,15 @@ jobs:
               PYTHONPATH=/src/code /tmp/neuroflow-glibc217-test/bin/python -m unittest \
                 neuroflow.tests.test_dicom_sort -v
             '
+      - name: Install DICOM conversion tools for the synthetic integration test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dcm2niix
+          "$RUNNER_TEMP/neuroflow-test-env/bin/pip" install "dcm2bids==3.3.1"
       - name: Run unit and web tests from the installed package
         run: |
           cd "$RUNNER_TEMP"
+          export PATH="$RUNNER_TEMP/neuroflow-test-env/bin:$PATH"
           "$RUNNER_TEMP/neuroflow-test-env/bin/python" - <<'PY'
           import os
           from pathlib import Path
