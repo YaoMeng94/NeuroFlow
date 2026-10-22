@@ -1,5 +1,5 @@
 #define AppName "NeuroFlow MRI Film Sheet"
-#define AppVersion "0.4.7"
+#define AppVersion "0.4.14"
 
 [Setup]
 AppId={{3DFEFC2C-9ED0-4770-AD45-C99E0E624971}

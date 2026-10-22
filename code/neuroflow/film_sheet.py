@@ -17,8 +17,7 @@ from typing import Literal
 import nibabel as nib
 import numpy as np
 import pydicom
-from nibabel.processing import resample_to_output
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 from pydicom.multival import MultiValue
 
 
@@ -55,6 +54,10 @@ class FilmSheetOptions:
     contrast: float = 1.0
     page_inches: tuple[float, float] = PAGE_INCHES
     axial_range_mm: tuple[float, float] | None = None
+    axial_start_mm: float | None = None
+    axial_gap_mm: float | None = None
+    coronal_range_mm: tuple[float, float] | None = None
+    sagittal_range_mm: tuple[float, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -104,26 +107,6 @@ def _first_float(value: object, default: float | None = None) -> float | None:
 
 def _description(ds: pydicom.Dataset, key: str) -> str:
     return str(getattr(ds, key, "") or "").strip()
-
-
-def _orthogonal_ras(image: nib.spatialimages.SpatialImage) -> nib.spatialimages.SpatialImage:
-    """Keep axis-aligned data at native spacing; resample oblique data onto a 1 mm RAS grid."""
-    affine = np.asarray(image.affine, dtype=float)
-    linear = affine[:3, :3]
-    spacing = np.linalg.norm(linear, axis=0)
-    if np.any(spacing <= 0):
-        raise ValueError("Image affine has zero or invalid voxel spacing.")
-    direction = linear / spacing
-    axis_aligned = np.allclose(direction, np.eye(3), atol=1e-5)
-    if axis_aligned:
-        return image
-    try:
-        return resample_to_output(image, voxel_sizes=(1.0, 1.0, 1.0), order=1)
-    except Exception as exc:
-        raise ValueError(
-            "This image needs orthogonal 1 mm resampling. Install the film-sheet extra with SciPy, "
-            "or use a build that includes its resampling runtime."
-        ) from exc
 
 
 def discover_dicom_series(source: str | Path) -> list[DicomSeries]:
@@ -241,7 +224,7 @@ def _read_dicom_frames(series: DicomSeries) -> list[_DicomFrame]:
         raise ValueError("DICOM series contains duplicate slice positions.")
     slice_spacing = float(np.median(gaps))
     if len(gaps) > 1 and np.max(np.abs(gaps - slice_spacing)) > max(0.25, slice_spacing * 0.10):
-        raise ValueError("DICOM slice spacing is irregular; resample or export a regular 3D series first.")
+        raise ValueError("DICOM slice spacing is irregular; this series does not have a regular source grid.")
 
     pixels = np.stack([frame.pixels * frame.slope + frame.intercept for frame in frames], axis=2)
     # DICOM pixel array axes are [row, column, slice]. Convert patient LPS to RAS.
@@ -254,8 +237,8 @@ def _read_dicom_frames(series: DicomSeries) -> list[_DicomFrame]:
     affine = lps_to_ras @ lps_affine
     image = nib.Nifti1Image(pixels, affine)
     image = nib.as_closest_canonical(image)
-    # Build orthogonal slices for the film views; the source remains unchanged on disk.
-    image = _orthogonal_ras(image)
+    # Preserve acquired samples. Canonical orientation only permutes/flips axes;
+    # it does not interpolate or resample voxel data.
     data = np.asarray(image.dataobj, dtype=np.float32)
     first_header = pydicom.dcmread(series.files[0], stop_before_pixels=True, force=False)
     center = _first_float(getattr(first_header, "WindowCenter", None))
@@ -304,7 +287,7 @@ def _sequence_label(*values: str) -> str:
 
 
 def load_image_volume(path: str | Path, *, series_uid: str | None = None) -> ImageVolume:
-    """Read a NIfTI file or a selected DICOM series into an orthogonal RAS volume."""
+    """Read a NIfTI file or selected DICOM series without resampling voxel data."""
     source = Path(path).expanduser().resolve()
     if source.is_dir():
         series = discover_dicom_series(source)
@@ -329,7 +312,6 @@ def load_image_volume(path: str | Path, *, series_uid: str | None = None) -> Ima
     if len(image.shape) != 3:
         raise ValueError(f"Expected a 3D anatomical image; found dimensions {image.shape}.")
     image = nib.as_closest_canonical(image)
-    image = _orthogonal_ras(image)
     data = np.asarray(image.dataobj, dtype=np.float32)
     if not np.isfinite(data).any() or float(np.nanmax(data)) <= float(np.nanmin(data)):
         raise ValueError("NIfTI image contains no usable intensity range.")
@@ -382,28 +364,53 @@ def _slice_bounds(data: np.ndarray, axis: int) -> tuple[int, int]:
     return int(valid[0]), int(valid[-1])
 
 
+def _axial_normal(volume: ImageVolume) -> np.ndarray:
+    normal = np.cross(volume.affine[:3, 0], volume.affine[:3, 1])
+    length = float(np.linalg.norm(normal))
+    if length <= 0:
+        raise ValueError("Image affine has invalid axial plane geometry.")
+    normal /= length
+    if float(np.dot(normal, volume.affine[:3, 2])) < 0:
+        normal *= -1
+    return normal
+
+
+def _axial_position_mm(volume: ImageVolume, index: float) -> float:
+    """Return the source slice position along its own normal in millimetres."""
+    center = np.array(
+        ((volume.data.shape[0] - 1) / 2, (volume.data.shape[1] - 1) / 2, index, 1.0),
+        dtype=float,
+    )
+    world = volume.affine @ center
+    return float(np.dot(world[:3], _axial_normal(volume)))
+
+
+def _axial_index_at_position(volume: ImageVolume, position_mm: float) -> float:
+    step = float(np.dot(volume.affine[:3, 2], _axial_normal(volume)))
+    return (float(position_mm) - _axial_position_mm(volume, 0)) / step
+
+
 def _suggest_axial_range_mm(
     volume: ImageVolume,
     *,
     bounds: tuple[int, int] | None = None,
 ) -> tuple[float, float]:
-    """Suggest a brain-focused axial slab, trimming long acquisitions' neck margins.
+    """Suggest a brain-focused axial slab, trimming long acquisitions' margins.
 
     Shorter head-only volumes use their full detected coverage. If occupied
-    axial coverage exceeds 180 mm, the excess above a 140 mm brain slab is
-    trimmed mostly from the inferior end to avoid spending a 30-slice sheet on
-    the upper neck. The GUI lets users edit these coordinates for local
+    axial coverage exceeds 80 mm, the excess above an 80 mm brain-focused
+    slab is trimmed mostly from the inferior end. This avoids spending several
+    panels on face and upper-neck anatomy while retaining the lower posterior
+    fossa and vertex. The GUI lets users edit these coordinates for local
     acquisition coverage.
     """
     low, high = bounds or _slice_bounds(volume.data, 2)
-    step = float(volume.affine[2, 2])
-    if abs(step) < 1e-8:
-        step = volume.voxel_sizes[2]
-    first = float(volume.affine[2, 3] + low * step)
-    last = float(volume.affine[2, 3] + high * step)
+    step = float(np.dot(volume.affine[:3, 2], _axial_normal(volume)))
+    first = _axial_position_mm(volume, low)
+    last = _axial_position_mm(volume, high)
     extent = abs(last - first)
-    if extent > 180.0:
-        excess = extent - 140.0
+    if extent > 80.0:
+        excess = extent - 80.0
         trim_inferior = excess * 0.85
         trim_superior = excess * 0.15
         if step > 0:
@@ -424,37 +431,79 @@ def _extract_plane(data: np.ndarray, plane: Plane, index: int) -> np.ndarray:
     return data[index, ::-1, ::-1].T
 
 
+def _plane_position_mm(volume: ImageVolume, plane: Plane, index: int) -> float:
+    axis = {"sagittal": 0, "coronal": 1, "axial": 2}[plane]
+    if plane == "axial":
+        return _axial_position_mm(volume, index)
+    normal = volume.affine[:3, axis] / np.linalg.norm(volume.affine[:3, axis])
+    return float(np.dot(volume.affine[:3, 3] + index * volume.affine[:3, axis], normal))
+
+
 def _slice_indices(
     volume: ImageVolume,
     plane: Plane,
     count: int,
     *,
     axial_range_mm: tuple[float, float] | None = None,
+    axial_start_mm: float | None = None,
+    axial_gap_mm: float | None = None,
+    coronal_range_mm: tuple[float, float] | None = None,
+    sagittal_range_mm: tuple[float, float] | None = None,
 ) -> list[int]:
     axis = {"sagittal": 0, "coronal": 1, "axial": 2}[plane]
     low, high = _slice_bounds(volume.data, axis)
-    if plane == "axial":
-        if axial_range_mm is None:
-            axial_range_mm = _suggest_axial_range_mm(volume, bounds=(low, high))
-        start_mm, end_mm = (float(value) for value in axial_range_mm)
-        if not math.isfinite(start_mm) or not math.isfinite(end_mm) or end_mm <= start_mm:
-            raise ValueError("Axial coverage must have a finite start below its end.")
-        step = float(volume.affine[axis, axis])
-        if abs(step) < 1e-8:
-            step = volume.voxel_sizes[axis]
-        origin = float(volume.affine[axis, 3])
-        first_mm = origin + low * step
-        last_mm = origin + high * step
-        minimum, maximum = min(first_mm, last_mm), max(first_mm, last_mm)
+    origin = _plane_position_mm(volume, plane, 0)
+    step = _plane_position_mm(volume, plane, 1) - origin
+    first_mm = origin + low * step
+    last_mm = origin + high * step
+    minimum, maximum = min(first_mm, last_mm), max(first_mm, last_mm)
+    if plane == "axial" and axial_gap_mm is not None:
+        start_mm = float(axial_start_mm) if axial_start_mm is not None else _suggest_axial_range_mm(volume, bounds=(low, high))[0]
+        gap_mm = float(axial_gap_mm)
+        if not math.isfinite(start_mm) or not math.isfinite(gap_mm) or gap_mm <= 0:
+            raise ValueError("Axial start must be finite and the fixed gap must be greater than zero.")
+        if start_mm < minimum or start_mm > maximum:
+            raise ValueError("Axial start is outside the image coverage.")
+        coordinates = start_mm + np.arange(count, dtype=float) * gap_mm
+        if coordinates[-1] > maximum + abs(step) * 0.5:
+            raise ValueError(
+                f"Only {int(np.floor((maximum - start_mm) / gap_mm)) + 1} slices fit in the image at this gap. "
+                "Reduce the image count or gap, or move the start plane."
+            )
+    else:
+        selected_range = {
+            "axial": axial_range_mm,
+            "coronal": coronal_range_mm,
+            "sagittal": sagittal_range_mm,
+        }[plane]
+        if selected_range is None:
+            selected_range = _suggest_axial_range_mm(volume, bounds=(low, high)) if plane == "axial" else (minimum, maximum)
+        start_mm, end_mm = (float(value) for value in selected_range)
+        if not math.isfinite(start_mm) or not math.isfinite(end_mm) or end_mm < start_mm:
+            raise ValueError(f"{plane.title()} coverage must have finite coordinates with the start at or below the end.")
+        if end_mm == start_mm and count > 1:
+            raise ValueError(f"{plane.title()} end must be greater than the start when selecting multiple images.")
         start_mm = min(max(start_mm, minimum), maximum)
         end_mm = min(max(end_mm, minimum), maximum)
-        if end_mm <= start_mm:
-            raise ValueError("Axial coverage does not overlap the image volume.")
-        coordinates = np.linspace(start_mm, end_mm, min(count, high - low + 1))
-        indices = np.rint((coordinates - origin) / step).astype(int)
-        return np.unique(np.clip(indices, low, high)).tolist()
-    actual_count = min(count, high - low + 1)
-    return np.rint(np.linspace(low, high, actual_count)).astype(int).tolist()
+        if end_mm < start_mm or (end_mm == start_mm and count > 1):
+            raise ValueError(f"{plane.title()} coverage must contain more than one plane when requesting multiple images.")
+        coordinates = np.linspace(start_mm, end_mm, count)
+    # Map requested millimetre positions to the nearest acquired plane.
+    # Several nearby targets can land on the same source slice; keep one
+    # copy so the film never prints duplicate panels.
+    indices = np.floor((coordinates - origin) / step + 0.5).astype(int)
+    indices = np.clip(indices, low, high)
+    return list(dict.fromkeys(indices.tolist()))
+
+
+def _plane_coordinate_range(volume: ImageVolume, plane: Plane) -> tuple[float, float]:
+    """Physical coverage along the native acquired-slice axis for a view."""
+    axis = {"sagittal": 0, "coronal": 1, "axial": 2}[plane]
+    low, high = _slice_bounds(volume.data, axis)
+    origin = _plane_position_mm(volume, plane, 0)
+    step = _plane_position_mm(volume, plane, 1) - origin
+    a, b = origin + low * step, origin + high * step
+    return min(a, b), max(a, b)
 
 
 def _plane_aspect_ratio(plane: np.ndarray, view: Plane, voxel_sizes: tuple[float, float, float]) -> float:
@@ -501,6 +550,135 @@ def _normalized_image(
     return image
 
 
+def render_film_sheet_page_preview(
+    volume: ImageVolume,
+    options: FilmSheetOptions,
+    plane: Plane,
+    *,
+    patient_name: str = "",
+    study_date: str = "",
+    width: int = 840,
+) -> Image.Image:
+    """Render a scaled, full-page preview using the PDF film-sheet layout.
+
+    This image is only a screen preview. The PDF writer continues to draw each
+    acquired source plane directly with its physical voxel aspect ratio.
+    """
+    if plane not in options.planes:
+        raise ValueError(f"The {plane} view is not selected for this film sheet.")
+    if width < 200:
+        raise ValueError("Preview width must be at least 200 pixels.")
+
+    indices = _slice_indices(
+        volume,
+        plane,
+        options.slices_per_plane,
+        axial_range_mm=options.axial_range_mm,
+        axial_start_mm=options.axial_start_mm,
+        axial_gap_mm=options.axial_gap_mm,
+        coronal_range_mm=options.coronal_range_mm,
+        sagittal_range_mm=options.sagittal_range_mm,
+    )
+    page_width = options.page_inches[0] * 72
+    page_height = options.page_inches[1] * 72
+    scale = width / page_width
+    height = round(page_height * scale)
+    page = Image.new("RGB", (width, height), (5, 8, 13))
+    draw = ImageDraw.Draw(page)
+
+    def point(value: float) -> int:
+        return int(round(value * scale))
+
+    def screen_y(value: float) -> int:
+        return height - point(value)
+
+    def font(points: float, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+        size = max(7, point(points))
+        font_paths = (
+            ("/System/Library/Fonts/PingFang.ttc", 0),
+            ("/System/Library/Fonts/Supplemental/Arial Unicode.ttf", 0),
+            ("C:/Windows/Fonts/msyh.ttc", 0),
+            ("C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf", 0),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 0),
+        )
+        for font_path, index in font_paths:
+            try:
+                return ImageFont.truetype(font_path, size=size, index=index)
+            except OSError:
+                continue
+        return ImageFont.load_default(size=size)
+
+    margin_x = 34
+    header_top = page_height - 32
+    header_height = 76
+    grid_top = header_top - header_height
+    footer = 30
+    gap_x = 9
+    gap_y = 9
+    label_height = 13
+    columns = min(options.columns, len(indices))
+    rows = math.ceil(len(indices) / columns)
+    cell_width = (page_width - 2 * margin_x - gap_x * (columns - 1)) / columns
+    cell_height = (grid_top - footer - gap_y * (rows - 1)) / rows
+    image_height = cell_height - label_height
+
+    foreground = (235, 240, 247)
+    muted = (179, 191, 207)
+    draw.text((point(margin_x), screen_y(header_top - 12)), f"{volume.sequence}  |  {plane.title()}", fill=foreground, font=font(18, bold=True), anchor="ls")
+    draw.text((point(margin_x), screen_y(header_top - 32)), f"Patient: {' '.join(patient_name.split()) or 'Not entered'}", fill=muted, font=font(9), anchor="ls")
+    draw.text((point(margin_x), screen_y(header_top - 47)), f"Study date: {' '.join(study_date.split()) or 'Not entered'}", fill=muted, font=font(9), anchor="ls")
+    draw.text((point(page_width - margin_x), screen_y(header_top - 47)), f"{len(indices)} slices", fill=muted, font=font(9), anchor="rs")
+    draw.line((point(margin_x), screen_y(grid_top + 3), point(page_width - margin_x), screen_y(grid_top + 3)), fill=(61, 74, 92), width=max(1, point(0.7)))
+
+    display_range = volume.display_range or _display_range(volume.data)
+    axis = {"sagittal": 0, "coronal": 1, "axial": 2}[plane]
+    for position, index in enumerate(indices):
+        row, column = divmod(position, columns)
+        x = margin_x + column * (cell_width + gap_x)
+        y_top = grid_top - row * (cell_height + gap_y)
+        y = y_top - cell_height
+        source_plane = _extract_plane(volume.data, plane, index)
+        image = _normalized_image(source_plane, options.contrast, display_range, volume.invert_grayscale)
+        aspect = _plane_aspect_ratio(source_plane, plane, volume.voxel_sizes)
+        if aspect >= cell_width / image_height:
+            draw_width = cell_width
+            draw_height = cell_width / aspect
+        else:
+            draw_height = image_height
+            draw_width = image_height * aspect
+        image_x = x + (cell_width - draw_width) / 2
+        image_y = y + label_height + (image_height - draw_height) / 2
+        preview_size = (max(1, point(draw_width)), max(1, point(draw_height)))
+        screen_image = image.resize(preview_size, Image.Resampling.LANCZOS).convert("RGB")
+        page.paste(screen_image, (point(image_x), height - point(image_y + draw_height)))
+
+        coordinate = _plane_position_mm(volume, plane, index)
+        axis_label = "pos" if plane == "axial" and not np.allclose(
+            volume.affine[:3, :3] / volume.voxel_sizes, np.eye(3), atol=1e-5
+        ) else "xyz"[axis]
+        draw.text(
+            (point(x + cell_width / 2), screen_y(y + label_height)),
+            f"{plane.title()}  {axis_label} {coordinate:+.0f} mm",
+            fill=muted,
+            font=font(8),
+            anchor="mt",
+        )
+        markers = {
+            "axial": (("R", "left"), ("L", "right"), ("A", "top"), ("P", "bottom")),
+            "coronal": (("R", "left"), ("L", "right"), ("S", "top"), ("I", "bottom")),
+            "sagittal": (("A", "left"), ("P", "right"), ("S", "top"), ("I", "bottom")),
+        }[plane]
+        marker_font = font(7, bold=True)
+        draw.text((point(image_x + 5), screen_y(image_y + draw_height / 2)), markers[0][0], fill=foreground, font=marker_font, anchor="lm")
+        draw.text((point(image_x + draw_width - 5), screen_y(image_y + draw_height / 2)), markers[1][0], fill=foreground, font=marker_font, anchor="rm")
+        draw.text((point(image_x + draw_width / 2), screen_y(image_y + draw_height - 8)), markers[2][0], fill=foreground, font=marker_font, anchor="ms")
+        draw.text((point(image_x + draw_width / 2), screen_y(image_y + 3)), markers[3][0], fill=foreground, font=marker_font, anchor="mt")
+
+    draw.text((point(margin_x), screen_y(14)), "NeuroFlow MRI film sheet  |  grayscale image display", fill=(122, 138, 158), font=font(7), anchor="ls")
+    draw.text((point(page_width - margin_x), screen_y(14)), f"{options.planes.index(plane) + 1} / {len(options.planes)}", fill=(122, 138, 158), font=font(7), anchor="rs")
+    return page
+
+
 def write_film_sheet(
     volume: ImageVolume,
     output: str | Path,
@@ -524,6 +702,19 @@ def write_film_sheet(
         raise ValueError("Slice count and column count must be positive.")
     if not opts.planes or any(plane not in {"axial", "coronal", "sagittal"} for plane in opts.planes):
         raise ValueError("Choose at least one valid view plane.")
+    plane_indices = {
+        plane: _slice_indices(
+            volume,
+            plane,
+            opts.slices_per_plane,
+            axial_range_mm=opts.axial_range_mm,
+            axial_start_mm=opts.axial_start_mm,
+            axial_gap_mm=opts.axial_gap_mm,
+            coronal_range_mm=opts.coronal_range_mm,
+            sagittal_range_mm=opts.sagittal_range_mm,
+        )
+        for plane in opts.planes
+    }
     destination = Path(output).expanduser().resolve()
     if destination.suffix.casefold() != ".pdf":
         destination = destination.with_suffix(".pdf")
@@ -556,12 +747,7 @@ def write_film_sheet(
             pdfmetrics.registerFont(UnicodeCIDFont(metadata_font))
 
     for page_number, plane_name in enumerate(opts.planes, start=1):
-        indices = _slice_indices(
-            volume,
-            plane_name,
-            opts.slices_per_plane,
-            axial_range_mm=opts.axial_range_mm,
-        )
+        indices = plane_indices[plane_name]
         columns = min(opts.columns, len(indices))
         rows = math.ceil(len(indices) / columns)
         cell_width = (page_width - 2 * margin_x - gap_x * (columns - 1)) / columns
@@ -600,8 +786,11 @@ def write_film_sheet(
             image_x = x + (cell_width - draw_width) / 2
             image_y = y + label_height + (image_height - draw_height) / 2
             pdf.drawImage(ImageReader(image), image_x, image_y, width=draw_width, height=draw_height, mask="auto")
-            coordinate = float(volume.affine[axis, 3] + index * voxel_sizes[axis])
-            coordinate_label = f"{'xyz'[axis]} {coordinate:+.0f} mm"
+            coordinate = _plane_position_mm(volume, plane_name, index)
+            axis_label = "pos" if plane_name == "axial" and not np.allclose(
+                volume.affine[:3, :3] / voxel_sizes, np.eye(3), atol=1e-5
+            ) else "xyz"[axis]
+            coordinate_label = f"{axis_label} {coordinate:+.0f} mm"
             pdf.setFillColorRGB(0.73, 0.78, 0.85)
             pdf.setFont("Helvetica", 8)
             pdf.drawCentredString(x + cell_width / 2, y + 2, f"{plane_name.title()}  {coordinate_label}")

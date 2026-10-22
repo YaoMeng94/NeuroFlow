@@ -20,7 +20,7 @@ from neuroflow.film_sheet import (
     FilmSheetOptions,
     ImageVolume,
     _extract_plane,
-    _orthogonal_ras,
+    _normalized_image,
     _plane_aspect_ratio,
     _slice_indices,
     _sequence_label,
@@ -137,6 +137,33 @@ class FilmSheetTests(unittest.TestCase):
             self.assertAlmostEqual(float(reader.pages[0].mediabox.width), 14 * 72)
             self.assertAlmostEqual(float(reader.pages[0].mediabox.height), 17 * 72)
 
+            fixed_gap_pdf = write_film_sheet(
+                loaded,
+                root / "fixed-gap-film.pdf",
+                options=FilmSheetOptions(
+                    slices_per_plane=4,
+                    axial_start_mm=10,
+                    axial_gap_mm=3,
+                ),
+            )
+            fixed_gap_text = PdfReader(str(fixed_gap_pdf)).pages[0].extract_text()
+            self.assertIn("4 slices", fixed_gap_text)
+            self.assertIn("Axial  z +10 mm", fixed_gap_text)
+            self.assertIn("Axial  z +19 mm", fixed_gap_text)
+
+            invalid_output = root / "invalid-fixed-gap-film.pdf"
+            with self.assertRaisesRegex(ValueError, "slices fit in the image"):
+                write_film_sheet(
+                    loaded,
+                    invalid_output,
+                    options=FilmSheetOptions(
+                        slices_per_plane=5,
+                        axial_start_mm=20,
+                        axial_gap_mm=10,
+                    ),
+                )
+            self.assertFalse(invalid_output.exists())
+
     def test_nifti_sidecar_metadata_without_pdf_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -194,7 +221,9 @@ class FilmSheetTests(unittest.TestCase):
             output = write_film_sheet(
                 loaded,
                 root / "dicom-film.pdf",
-                options=FilmSheetOptions(slices_per_plane=40),
+                # Cover all acquired DICOM planes. The GUI's brain-focused
+                # default intentionally trims long acquisitions.
+                options=FilmSheetOptions(slices_per_plane=40, axial_range_mm=(0.0, 155.0)),
             )
             text = PdfReader(str(output)).pages[0].extract_text()
             self.assertIn("32 slices", text)
@@ -215,6 +244,11 @@ class FilmSheetTests(unittest.TestCase):
         plane = np.zeros((300, 200))
         self.assertAlmostEqual(_plane_aspect_ratio(plane, "coronal", (1, 1, 5)), 200 / 1500)
 
+    def test_display_image_preserves_source_plane_matrix_dimensions(self) -> None:
+        plane = np.arange(31 * 47, dtype=np.float32).reshape((31, 47))
+        display = _normalized_image(plane, 1.0, (0.0, float(plane.max())))
+        self.assertEqual(display.size, (47, 31))
+
     def test_long_axial_coverage_trims_neck_and_accepts_user_range(self) -> None:
         data = np.zeros((32, 32, 211), dtype=np.float32)
         data[5:27, 5:27, :] = 100
@@ -223,12 +257,15 @@ class FilmSheetTests(unittest.TestCase):
         volume = ImageVolume(data=data, affine=affine, source_label="demo_T1w.nii.gz")
 
         suggested = _suggest_axial_range_mm(volume)
-        self.assertGreater(suggested[0], -60)
-        self.assertLess(suggested[0], -45)
-        self.assertAlmostEqual(suggested[1], 89.5)
+        self.assertAlmostEqual(suggested[0], 0.5)
+        self.assertAlmostEqual(suggested[1], 80.5)
         automatic_indices = _slice_indices(volume, "axial", 30)
         self.assertEqual(len(automatic_indices), 30)
         self.assertEqual(len(set(automatic_indices)), 30)
+        self.assertEqual(
+            len(_slice_indices(volume, "axial", 1, axial_range_mm=(0, 0))),
+            1,
+        )
 
         custom_indices = _slice_indices(volume, "axial", 30, axial_range_mm=(-80, 60))
         self.assertAlmostEqual(custom_indices[0] - 110, -80, delta=1)
@@ -236,19 +273,103 @@ class FilmSheetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _slice_indices(volume, "axial", 30, axial_range_mm=(20, -20))
 
-    def test_oblique_input_is_resampled_to_orthogonal_ras(self) -> None:
-        try:
-            import scipy.ndimage  # noqa: F401
-        except Exception as exc:
-            self.skipTest(f"SciPy resampling runtime is unavailable: {exc}")
-        angle = np.deg2rad(8)
+    def test_fixed_axial_gap_and_image_count(self) -> None:
+        data = np.zeros((16, 16, 80), dtype=np.float32)
+        data[4:12, 4:12, :] = 100
         affine = np.eye(4)
-        affine[:3, :3] = ((np.cos(angle), -np.sin(angle), 0), (np.sin(angle), np.cos(angle), 0), (0, 0, 1))
-        image = nib.Nifti1Image(np.ones((24, 24, 24), dtype=np.float32), affine)
-        result = _orthogonal_ras(nib.as_closest_canonical(image))
-        direction = result.affine[:3, :3] / np.linalg.norm(result.affine[:3, :3], axis=0)
-        self.assertTrue(np.allclose(direction, np.eye(3), atol=1e-5))
-        self.assertTrue(np.allclose(np.linalg.norm(result.affine[:3, :3], axis=0), 1.0))
+        affine[2, 3] = -40
+        volume = ImageVolume(data=data, affine=affine, source_label="demo")
+
+        indices = _slice_indices(
+            volume,
+            "axial",
+            10,
+            axial_start_mm=-10,
+            axial_gap_mm=5,
+        )
+        self.assertEqual(len(indices), 10)
+        self.assertEqual(indices[0], 30)
+        self.assertEqual(indices[-1], 75)
+
+        with self.assertRaisesRegex(ValueError, "Only 4 slices fit"):
+            _slice_indices(
+                volume,
+                "axial",
+                10,
+                axial_start_mm=20,
+                axial_gap_mm=5,
+            )
+
+        subvoxel_indices = _slice_indices(
+            volume,
+            "axial",
+            3,
+            axial_start_mm=0,
+            axial_gap_mm=0.5,
+        )
+        self.assertEqual(subvoxel_indices, [40, 41])
+
+    def test_axial_gap_below_acquisition_spacing_uses_nearest_unique_planes(self) -> None:
+        data = np.broadcast_to(np.arange(10, dtype=np.float32)[None, None, :] * 100, (4, 4, 10)).copy()
+        affine = np.diag((0.8, 0.8, 5.0, 1.0))
+        volume = ImageVolume(data=data, affine=affine, source_label="synthetic anisotropic T1w")
+
+        indices = _slice_indices(volume, "axial", 3, axial_start_mm=10, axial_gap_mm=2.5)
+        sample_values = [_extract_plane(data, "axial", index)[0, 0] for index in indices]
+
+        self.assertEqual(indices, [2, 3])
+        self.assertTrue(np.allclose(sample_values, (200, 300)))
+
+        if PDF_RENDERING_AVAILABLE:
+            with tempfile.TemporaryDirectory() as tmp:
+                output = write_film_sheet(
+                    volume,
+                    Path(tmp) / "anisotropic-film.pdf",
+                    options=FilmSheetOptions(
+                        slices_per_plane=3,
+                        axial_start_mm=10,
+                        axial_gap_mm=3,
+                    ),
+                )
+                text = PdfReader(str(output)).pages[0].extract_text()
+                self.assertIn("2 slices", text)
+                self.assertIn("Axial  z +15 mm", text)
+
+    def test_oblique_anisotropic_input_preserves_native_voxels(self) -> None:
+        angle = np.deg2rad(18)
+        rotation = np.array(
+            ((np.cos(angle), 0, np.sin(angle)), (0, 1, 0), (-np.sin(angle), 0, np.cos(angle))),
+            dtype=float,
+        )
+        native_spacing = np.array((0.8, 0.8, 5.0))
+        affine = np.eye(4)
+        affine[:3, :3] = rotation @ np.diag(native_spacing)
+        data = np.arange(32 * 32 * 24, dtype=np.float32).reshape((32, 32, 24))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "oblique_anisotropic_T1w.nii.gz"
+            nib.save(nib.Nifti1Image(data, affine), path)
+            loaded = load_image_volume(path)
+
+        expected = nib.as_closest_canonical(nib.Nifti1Image(data, affine))
+        self.assertEqual(loaded.data.shape, expected.shape)
+        self.assertTrue(np.array_equal(loaded.data, np.asarray(expected.dataobj)))
+        self.assertTrue(np.allclose(loaded.affine, expected.affine))
+        self.assertTrue(np.allclose(loaded.voxel_sizes, np.linalg.norm(expected.affine[:3, :3], axis=0)))
+        start, end = _suggest_axial_range_mm(loaded)
+        indices = _slice_indices(loaded, "axial", 5, axial_range_mm=(start, end))
+        self.assertEqual(len(indices), len(set(indices)))
+        if PDF_RENDERING_AVAILABLE:
+            with tempfile.TemporaryDirectory() as tmp:
+                output = write_film_sheet(
+                    loaded,
+                    Path(tmp) / "oblique-native-film.pdf",
+                    options=FilmSheetOptions(
+                        slices_per_plane=5,
+                        axial_range_mm=(start, end),
+                    ),
+                )
+                text = PdfReader(str(output)).pages[0].extract_text()
+                self.assertIn("Axial  pos", text)
 
 
 if __name__ == "__main__":
