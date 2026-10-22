@@ -16,8 +16,8 @@ jobs:
         os: [windows-latest, macos-latest, macos-15-intel]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install the standalone build dependencies
@@ -145,7 +145,7 @@ jobs:
           if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
           $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: NeuroFlowDICOMSorter-${{ runner.os }}-${{ runner.arch }}
           path: |
@@ -157,8 +157,8 @@ jobs:
   package-linux-controller:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Build controller wheel and offline pipeline wheelhouse
@@ -188,7 +188,7 @@ jobs:
             XDG_CONFIG_HOME="$RUNNER_TEMP/neuroflow-sorter-test-config" xvfb-run -a \
               "$venv/bin/python" "$GITHUB_WORKSPACE/code/neuroflow/tests/standalone_gui_integration.py"
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: NeuroFlow-Linux-controller
           path: dist/linux-release/*
@@ -197,8 +197,8 @@ jobs:
   package-windows-controller:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Test Windows controller job locking
@@ -315,7 +315,7 @@ jobs:
           $siteData = Get-Content $site -Raw | ConvertFrom-Json
           if ($siteData.pipeline_root -ne $preservedPipelineRoot) { throw 'Uninstaller altered user configuration' }
           if (-not (Test-Path $jobMarker)) { throw 'Uninstaller removed job-state data' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: NeuroFlow-Windows-controller
           path: dist/windows-release/*
@@ -328,8 +328,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Verify release tag matches package version
@@ -340,7 +340,7 @@ jobs:
             echo "Release tag $GITHUB_REF_NAME does not match package version $project_version" >&2
             exit 1
           fi
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: NeuroFlow*
           path: release-assets

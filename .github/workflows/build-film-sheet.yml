@@ -14,8 +14,8 @@ jobs:
         os: [windows-latest, macos-latest, macos-15-intel, ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
       - name: Install the app and build dependencies
@@ -44,7 +44,7 @@ jobs:
       - name: Package Linux application archive
         if: runner.os == 'Linux'
         run: tar -czf NeuroFlowMRIFilmSheet-Linux-${{ runner.arch }}.tar.gz -C dist/film_sheet NeuroFlowMRIFilmSheet
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: NeuroFlowMRIFilmSheet-${{ runner.os }}-${{ runner.arch }}
           path: |
@@ -60,7 +60,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: NeuroFlowMRIFilmSheet-*
           path: release-assets
