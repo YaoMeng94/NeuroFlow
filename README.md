@@ -104,18 +104,20 @@ The versioned Linux/HPC release bundle is built with
 For the Windows controller bundle and per-user Start Menu launcher, see
 `docs/INSTALL_WINDOWS.md`. It uses an offline Python wheelhouse and requires
 64-bit CPython 3.11; the DICOM sorter remains a separate standalone installer.
-The current source at `f6c9ac9` passed the Linux install, upgrade, uninstall,
-glibc 2.17, sorter GUI, real synthetic DICOM-to-BIDS conversion, and unit/web
-checks in [Actions test run 39712203367](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39712203367).
-Native Windows and macOS sorter builds and controller bundles passed in
-[Actions build run 39712203406](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39712203406).
-These run artifacts are temporary. The `neuroflow-v0.4.13` draft was built
-from the earlier commit `edb38b1`; it omits the DICOM mapping fix. The current
-validated package candidate is 0.4.14, which is being prepared as a separate
-unpublished draft. See
+The `neuroflow-v0.4.14` candidate at `d258c08` passed the Linux install,
+upgrade, uninstall, glibc 2.17, sorter GUI, synthetic DICOM-to-BIDS, and
+unit/web checks in [Actions test run 39713726335](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726335).
+Native Windows and macOS builds, installer smoke tests, and Linux/HPC bundle
+checks passed in [Actions build run 39713726327](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726327).
+Both workflows ran on the versioned tag. The [0.4.14 GitHub Release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
+is an unpublished draft containing versioned platform bundles and checksums;
+it is for controlled internal testing, not public distribution. The older
+`neuroflow-v0.4.13` draft remains unchanged and is tied to `edb38b1`. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific test guidance. Public
-macOS distribution still requires Developer ID signing and notarization.
+macOS distribution still requires Developer ID signing and notarization. A
+read-only planning smoke test also accepted an existing BIDS dataset for all
+three modalities without invoking DICOM conversion or launching processing.
 
 ## Site Configuration
 

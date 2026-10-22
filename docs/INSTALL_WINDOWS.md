@@ -6,14 +6,15 @@ Python Launcher (`py.exe`). If these are not installed, install Python 3.11 x64
 from [python.org](https://www.python.org/downloads/windows/) and rerun the
 installer.
 
-The Windows controller bundle was built and its native smoke tests passed on
-commit `f6c9ac9` (Actions run `39712203406`). The tests cover current-user
-installation, reinstall/profile preservation, live UI startup, and uninstall;
-the incomplete-wheelhouse failure path was also exercised. The standalone
-Windows DICOM sorter installer and app were built and tested in the same
-workflow. The `neuroflow-v0.4.13` draft is from an earlier source commit; use
-the `neuroflow-v0.4.14` draft for internal testing after its assets and
-checksums finish generating. It remains unpublished.
+The Windows controller bundle and standalone sorter installer passed native
+smoke tests on the `neuroflow-v0.4.14` tag at commit `d258c08` (Actions build
+run `39713726327`). Controller tests cover current-user installation,
+reinstall/profile preservation, live UI startup, uninstall, and an
+incomplete-wheelhouse failure path. The versioned packages and SHA-256 files
+are available in the unpublished
+[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
+for controlled internal testing. The earlier `neuroflow-v0.4.13` draft is
+tied to a previous source commit and remains unchanged.
 
 Download the `NeuroFlow-Windows-controller` archive from the
 [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14).

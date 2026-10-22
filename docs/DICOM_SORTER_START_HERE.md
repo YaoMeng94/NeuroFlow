@@ -7,16 +7,16 @@ are installed separately.
 
 ## Test artifact status
 
-Native platform builds and smoke tests passed on commit `f6c9ac9` in Actions
-run `39712203406`. The run includes Linux and Windows controller bundles, a
-Windows sorter installer, and macOS ARM64 and Intel sorter apps. The Linux
-controller install, upgrade, uninstall, glibc 2.17, sorter GUI, real synthetic
-DICOM-to-BIDS conversion, and unit/web tests passed in run `39712203367`.
-The earlier `neuroflow-v0.4.13` draft is tied to commit `edb38b1` and does not
-contain the current DICOM mapping fix. The `neuroflow-v0.4.14` release is a
-draft for internal testing and remains unpublished. Do not redistribute it as
-a stable public release. The macOS apps are not notarized; follow the controlled
-internal-test steps in `INSTALL_MACOS.md`.
+Native platform builds and smoke tests passed on the `neuroflow-v0.4.14` tag
+at commit `d258c08` in Actions run `39713726327`. It produced Linux and Windows
+controller bundles, a Windows sorter installer, and macOS ARM64 and Intel
+sorter apps. Linux install/upgrade/uninstall, glibc 2.17, sorter GUI, synthetic
+DICOM-to-BIDS conversion, and unit/web tests passed in run `39713726335`. The
+0.4.14 GitHub Release is an unpublished draft with versioned packages and
+checksums for controlled internal testing; do not redistribute it as a stable
+public release. The earlier `neuroflow-v0.4.13` draft remains unchanged. The
+macOS apps are not notarized; follow the controlled internal-test steps in
+`INSTALL_MACOS.md`.
 
 ## Install and launch
 

@@ -7,13 +7,13 @@ tedana, QSIPrep, QSIRecon, Workbench, or Apptainer images.
 
 ## Current distribution status
 
-Native GitHub Actions packaging passed for both macOS architectures on commit
-`f6c9ac9` (run `39712203406`): the ARM64 and Intel sorter app archives were
-built, checksummed, and passed their packaged self-tests and GUI startup checks.
-Download the `NeuroFlowDICOMSorter-macOS-ARM64` or
-`NeuroFlowDICOMSorter-macOS-X64` artifact from that workflow run. These are
-temporary Actions artifacts, not a versioned GitHub Release; do not treat them
-as a stable public release.
+Native GitHub Actions packaging passed for both macOS architectures on the
+`neuroflow-v0.4.14` tag at commit `d258c08` (run `39713726327`). The ARM64 and
+Intel app archives were built, checksummed, and passed packaged self-tests and
+GUI startup checks. Download `NeuroFlowDICOMSorter-macOS-ARM64-0.4.14.zip` or
+`NeuroFlowDICOMSorter-macOS-X64-0.4.14.zip` from the
+[`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14).
+The draft is unpublished and for controlled internal testing only.
 
 The apps are **not notarized**. No valid code-signing identity was available on
 the build Mac when checked on 2026-10-22. Public distribution requires a
@@ -28,8 +28,8 @@ metadata and is not a release artifact.
 
 1. Download one of the macOS sorter artifacts from the
    [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14)
-   and locate the packaged `.zip` and adjacent `.zip.sha256` file.
-   Do not use this archive for public distribution.
+   and locate the matching `.zip` and adjacent `.zip.sha256` file. Do not use
+   this archive for public distribution.
 2. Verify the archive checksum before opening it:
 
    ```bash
