@@ -515,7 +515,9 @@ class SorterWindow:
     def _update_copy_state(self) -> None:
         if self.busy:
             return
-        allowed = bool(self.rows) and (self.review_var.get() or not any(row["status"] != "matched" for row in self.rows))
+        allowed = bool(self.rows) and (
+            self.review_var.get() or not any(row.get("status", "") != "matched" for row in self.rows)
+        )
         self.copy_button.configure(state="normal" if allowed else "disabled")
 
     def _populate(self, rows: list[dict[str, Any]]) -> None:
