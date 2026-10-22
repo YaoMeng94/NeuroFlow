@@ -30,6 +30,7 @@ from .bids_finalize import finalize_bids
 APP_NAME = "NeuroFlow DICOM Sorter"
 PRESET_NAME = "dicom_sort_rules_20261016.json"
 BIDS_CONFIG_NAME = "dcm2bids_config_prisma.json"
+ALL_SUBJECTS_OPTION = "All subjects"
 TABLE_COLUMNS = ("subject", "series", "description", "protocol", "files", "category", "status")
 
 
@@ -168,6 +169,9 @@ class SorterWindow:
         ttk.Label(bids, text="Subject to convert").grid(row=3, column=0, sticky="w", padx=(0, 10), pady=4)
         self.bids_subject_combo = ttk.Combobox(bids, textvariable=self.bids_subject_var, state="readonly", width=24)
         self.bids_subject_combo.grid(row=3, column=1, sticky="w", pady=4)
+        ttk.Label(bids, text="Choose ‘All subjects’ to convert every participant found in the preview.", wraplength=430).grid(
+            row=3, column=2, columnspan=2, sticky="w", padx=(10, 0), pady=4
+        )
         ttk.Label(bids, text="Session (optional)").grid(row=4, column=0, sticky="w", padx=(0, 10), pady=4)
         ttk.Entry(bids, textvariable=self.session_var, width=24).grid(row=4, column=1, sticky="w", pady=4)
         bids.columnconfigure(1, weight=1)
@@ -412,15 +416,24 @@ class SorterWindow:
         output_text = self.bids_output_var.get().strip()
         config_text = self.bids_config_var.get().strip()
         subject_label = self.bids_subject_var.get().strip()
-        subject_id = re.sub(r"^sub-", "", subject_label, flags=re.IGNORECASE)
+        available_subjects = sorted({str(row.get("study", "")) for row in self.rows if row.get("study")})
+        convert_all = subject_label == ALL_SUBJECTS_OPTION
+        selected_subjects = available_subjects if convert_all else [subject_label]
+        participants = [
+            (label, re.sub(r"^sub-", "", label, flags=re.IGNORECASE))
+            for label in selected_subjects
+        ]
         session = self.session_var.get().strip()
         if not source_text or not Path(source_text).expanduser().is_dir() or not self.rows:
             messagebox.showerror(APP_NAME, "Choose a scanner folder and preview its series first.", parent=self.root)
             return
-        if not re.fullmatch(r"[A-Za-z0-9]+", subject_id):
+        if not participants or any(
+            label not in available_subjects or not re.fullmatch(r"[A-Za-z0-9]+", participant)
+            for label, participant in participants
+        ):
             messagebox.showerror(
                 APP_NAME,
-                "Choose a subject detected from the DICOM PatientID values in the preview.",
+                "Choose a detected subject or ‘All subjects’ from the subject list.",
                 parent=self.root,
             )
             return
@@ -445,41 +458,58 @@ class SorterWindow:
                 parent=self.root,
             )
             return
-        source = Path(self.output_var.get().strip()).expanduser() / subject_label
-        if not source.is_dir():
-            messagebox.showerror(APP_NAME, "Sort the DICOM files first, then select a subject folder from the sorted output.", parent=self.root)
+        sorted_root = Path(self.output_var.get().strip()).expanduser()
+        missing_subjects = [label for label, _ in participants if not (sorted_root / label).is_dir()]
+        if missing_subjects:
+            messagebox.showerror(
+                APP_NAME,
+                "Sort the DICOM files first. Missing sorted subject folder(s): " + ", ".join(missing_subjects),
+                parent=self.root,
+            )
             return
+        selection = f"all {len(participants)} detected subjects" if convert_all else subject_label
+        bids_labels = [f"sub-{participant}" for _, participant in participants]
+        session_suffix = f"_ses-{session}" if session else ""
         if not messagebox.askyesno(
             APP_NAME,
-            f"Convert the scanner folder to BIDS as sub-{subject_id}{f'_ses-{session}' if session else ''}?\n\nThe DICOM source will remain unchanged.",
+            f"Convert {selection} to BIDS{session_suffix}?\n\n"
+            f"Participants: {', '.join(bids_labels) if len(bids_labels) <= 5 else f'{len(bids_labels)} detected subjects'}\n\n"
+            "The DICOM source will remain unchanged.",
             parent=self.root,
         ):
             return
-        self._set_busy(True, "Converting DICOM files to BIDS… This may take several minutes.")
+        self._set_busy(True, f"Converting {selection} to BIDS… This may take several minutes.")
 
         def convert() -> str:
             config = json.loads(Path(config_text).expanduser().read_text(encoding="utf-8"))
             output.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(prefix="neuroflow-dcm2bids-", dir=output.parent) as temp_dir:
-                staged = Path(temp_dir) / "dicom"
-                staged.mkdir()
-                count = 0
-                for path in source.rglob("*"):
-                    if path.is_file():
-                        count += 1
-                        shutil.copyfile(path, staged / f"{count:08d}{path.suffix or '.dcm'}")
-                if not count:
-                    raise ValueError("The selected sorted subject folder contains no files")
-                command = [executable, "-d", str(staged), "-p", subject_id,
-                           "-c", str(Path(config_text).expanduser()), "-o", str(output)]
-                if session:
-                    command.extend(["-s", session])
-                result = subprocess.run(command, capture_output=True, text=True)
-                if result.returncode:
-                    details = (result.stderr or result.stdout or "No converter details were returned").strip()
-                    raise RuntimeError(f"dcm2bids failed (exit {result.returncode}):\n{details[-3000:]}")
-            finalize_bids(output, subject_id, session, config)
-            return str(output)
+            for index, (label, participant) in enumerate(participants, 1):
+                self.events.put(("progress", f"Converting {label} to BIDS ({index} of {len(participants)})…"))
+                subject_source = sorted_root / label
+                with tempfile.TemporaryDirectory(prefix="neuroflow-dcm2bids-", dir=output.parent) as temp_dir:
+                    staged = Path(temp_dir) / "dicom"
+                    staged.mkdir()
+                    count = 0
+                    for path in subject_source.rglob("*"):
+                        if path.is_file():
+                            count += 1
+                            shutil.copyfile(path, staged / f"{count:08d}{path.suffix or '.dcm'}")
+                    if not count:
+                        raise ValueError(f"The sorted folder for {label} contains no files")
+                    command = [executable, "-d", str(staged), "-p", participant,
+                               "-c", str(Path(config_text).expanduser()), "-o", str(output)]
+                    if session:
+                        command.extend(["-s", session])
+                    result = subprocess.run(command, capture_output=True, text=True)
+                    if result.returncode:
+                        details = (result.stderr or result.stdout or "No converter details were returned").strip()
+                        raise RuntimeError(
+                            f"dcm2bids failed for {label} ({index - 1} of {len(participants)} subjects completed; "
+                            f"exit {result.returncode}). Partial output may exist at {output}.\n{details[-3000:]}"
+                        )
+                self.events.put(("progress", f"Finalizing {label} ({index} of {len(participants)})…"))
+                finalize_bids(output, participant, session, config)
+            return f"{len(participants)} subject(s) converted to BIDS: {output}"
         self._worker("bids_done", convert)
 
     def _update_copy_state(self) -> None:
@@ -491,7 +521,8 @@ class SorterWindow:
     def _populate(self, rows: list[dict[str, Any]]) -> None:
         self.rows = rows
         subject_labels = sorted({str(row.get("study", "")) for row in rows if row.get("study")})
-        self.bids_subject_combo.configure(values=subject_labels)
+        choices = (ALL_SUBJECTS_OPTION, *subject_labels) if subject_labels else ()
+        self.bids_subject_combo.configure(values=choices)
         self.bids_subject_var.set(subject_labels[0] if subject_labels else "")
         for item in self.table.get_children():
             self.table.delete(item)
@@ -533,7 +564,7 @@ class SorterWindow:
                     messagebox.showinfo(APP_NAME, f"Sorting completed.\n\nOutput folder:\n{self.output_var.get()}", parent=self.root)
                 elif name == "bids_done":
                     self._set_busy(False, f"BIDS conversion completed: {value}")
-                    messagebox.showinfo(APP_NAME, f"BIDS conversion completed.\n\nOutput folder:\n{value}", parent=self.root)
+                    messagebox.showinfo(APP_NAME, f"BIDS conversion completed.\n\n{value}", parent=self.root)
                 elif name == "progress":
                     self.status_var.set(str(value))
                 elif name == "error":

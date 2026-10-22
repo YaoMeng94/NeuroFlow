@@ -104,11 +104,15 @@ The versioned Linux/HPC release bundle is built with
 For the Windows controller bundle and per-user Start Menu launcher, see
 `docs/INSTALL_WINDOWS.md`. It uses an offline Python wheelhouse and requires
 64-bit CPython 3.11; the DICOM sorter remains a separate standalone installer.
-The native macOS ARM64 and Intel sorter builds, Windows sorter/controller
-packages, and Linux/HPC controller bundle passed in GitHub Actions run
-`39710399285`. The Linux controller install, upgrade, uninstall, glibc 2.17,
-sorter GUI, and unit/web tests passed in run `39710399249`. These are temporary
-Actions artifacts, not a versioned GitHub Release. See
+The current source at `f6c9ac9` passed the Linux install, upgrade, uninstall,
+glibc 2.17, sorter GUI, real synthetic DICOM-to-BIDS conversion, and unit/web
+checks in [Actions test run 39712203367](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39712203367).
+Native Windows and macOS sorter builds and controller bundles passed in
+[Actions build run 39712203406](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39712203406).
+These run artifacts are temporary. The `neuroflow-v0.4.13` draft was built
+from the earlier commit `edb38b1`; it omits the DICOM mapping fix. The current
+validated package candidate is 0.4.14, which is being prepared as a separate
+unpublished draft. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific test guidance. Public
 macOS distribution still requires Developer ID signing and notarization.

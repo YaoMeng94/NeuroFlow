@@ -7,13 +7,15 @@ are installed separately.
 
 ## Test artifact status
 
-Native platform builds and smoke tests passed on commit `bdb6750` in Actions
-run `39710399285`. The run includes Linux and Windows controller bundles, a
+Native platform builds and smoke tests passed on commit `f6c9ac9` in Actions
+run `39712203406`. The run includes Linux and Windows controller bundles, a
 Windows sorter installer, and macOS ARM64 and Intel sorter apps. The Linux
-controller install, upgrade, uninstall, glibc 2.17, sorter GUI, and unit/web
-tests passed in run `39710399249`. These are temporary GitHub Actions
-artifacts, not a versioned GitHub Release. Do not redistribute them as stable
-public releases. The macOS apps are not notarized; follow the controlled
+controller install, upgrade, uninstall, glibc 2.17, sorter GUI, real synthetic
+DICOM-to-BIDS conversion, and unit/web tests passed in run `39712203367`.
+The earlier `neuroflow-v0.4.13` draft is tied to commit `edb38b1` and does not
+contain the current DICOM mapping fix. The `neuroflow-v0.4.14` release is a
+draft for internal testing and remains unpublished. Do not redistribute it as
+a stable public release. The macOS apps are not notarized; follow the controlled
 internal-test steps in `INSTALL_MACOS.md`.
 
 ## Install and launch
@@ -21,11 +23,13 @@ internal-test steps in `INSTALL_MACOS.md`.
 Use only a versioned, checksum-verified package for your operating system. No
 Python installation is needed to run a published standalone desktop package.
 
-- **macOS:** download the ARM64 or X64 artifact from Actions run
-  `39710399285`, verify its checksum, and follow the internal-test steps in
+- **macOS:** download the ARM64 or X64 artifact from the
+  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14),
+  verify its checksum, and follow the internal-test steps in
   `INSTALL_MACOS.md`.
-- **Windows:** download the Windows sorter artifact from Actions run
-  `39710399285`, verify its adjacent `.exe.sha256`, then run the installer.
+- **Windows:** download the Windows sorter installer from the
+  [`neuroflow-v0.4.14` draft release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/neuroflow-v0.4.14),
+  verify its adjacent `.exe.sha256`, then run the installer.
   The controller bundle and its installation steps are in `INSTALL_WINDOWS.md`.
 - **Linux desktop:** install the Linux/HPC NeuroFlow bundle. The
   `neuroflow-dicom-sorter` command is added when its Python has Tk support.
@@ -72,14 +76,18 @@ scanner-export_sorted/
 The included sequence rules were derived from one Prisma protocol. Use
 **Advanced: change sequence rules** to open or select the JSON rule file.
 
-## Convert a sorted subject to BIDS
+## Convert sorted subjects to BIDS
 
 1. Preview and sort the export first.
-2. Select a `sub-…` entry under **Subject to convert**.
+2. Under **Subject to convert**, select one `sub-…` entry or **All subjects**.
 3. Choose a new or empty BIDS output folder. The app selects an included
    `dcm2bids` config for the tested Prisma sequences; use **Open config** to
    review or edit it. You can also browse to another config.
 4. Optionally enter a session label, then click **Convert to BIDS…**.
+
+When **All subjects** is selected, participants are converted one at a time
+into the same BIDS output folder. Temporary staged DICOM files are removed
+after each participant completes.
 
 `dcm2bids` and `dcm2niix` must be installed and available on `PATH`. Review the
 mapping before conversion. The default config covers the observed anatomical,

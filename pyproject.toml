@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neuroflow"
-version = "0.4.13"
+version = "0.4.14"
 description = "Local web and CLI controller for multimodal BIDS processing"
 requires-python = ">=3.10"
 dependencies = [

@@ -114,6 +114,22 @@ def _dicomdir_records(
 
     series_meta: dict[tuple[str, str], dict[str, str]] = {}
     series_files: dict[tuple[str, str], list[Path]] = defaultdict(list)
+    expected = {path.resolve() for path in paths if path.name.casefold() != "dicomdir"}
+    # DICOMDIR File IDs are relative to the original export root. When users
+    # copy a DICOMDIR beside a selected subfolder, rebase only if every ID maps
+    # uniquely to a file in that selected source.
+    source_by_suffix: dict[tuple[str, ...], set[Path]] = defaultdict(set)
+    max_suffix = 0
+    for path in expected:
+        try:
+            relative_parts = path.relative_to(source).parts
+        except ValueError:
+            continue
+        max_suffix = max(max_suffix, len(relative_parts))
+        folded_parts = tuple(part.casefold() for part in relative_parts)
+        for length in range(1, len(folded_parts) + 1):
+            source_by_suffix[folded_parts[-length:]].add(path)
+
     study_uid = ""
     current_series: tuple[str, str] | None = None
     referenced: list[Path] = []
@@ -139,13 +155,25 @@ def _dicomdir_records(
             elif kind in {"IMAGE", "RAW DATA", "SR DOCUMENT", "PRESENTATION"} and current_series:
                 file_id = getattr(entry, "ReferencedFileID", None)
                 if file_id:
-                    path = dicomdir.parent.joinpath(*map(str, file_id)).resolve()
+                    parts = tuple(map(str, file_id))
+                    path = dicomdir.parent.joinpath(*parts).resolve()
+                    if path not in expected:
+                        path = None
+                        folded_parts = tuple(part.casefold() for part in parts)
+                        for length in range(min(len(folded_parts), max_suffix), 0, -1):
+                            matches = source_by_suffix.get(folded_parts[-length:], set())
+                            if matches:
+                                if len(matches) != 1:
+                                    return None
+                                path = next(iter(matches))
+                                break
+                    if path is None:
+                        return None
                     referenced.append(path)
                     series_files[current_series].append(path)
     except Exception:
         return None
 
-    expected = {path.resolve() for path in paths if path.name.casefold() != "dicomdir"}
     indexed = set(referenced)
     if len(referenced) != len(indexed) or indexed != expected or not series_meta:
         return None
@@ -249,10 +277,10 @@ def inspect_dicom(
         # Header reads are I/O bound; a small thread pool helps on large exports
         # without copying pixel data or creating platform-specific process workers.
         with ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 1)) as pool:
-            for index, record in enumerate(pool.map(_read_file, paths, chunksize=32), 1):
+            for index, record in enumerate(pool.map(_read_file, paths, chunksize=8), 1):
                 if record:
                     records[(record.study_uid, record.series_uid)].append(record)
-                if progress_callback and (index % 500 == 0 or index == len(paths)):
+                if progress_callback and (index % 100 == 0 or index == len(paths)):
                     progress_callback(f"Reading DICOM headers: {index:,} of {len(paths):,} files…")
 
     study_ids = _subject_labels(records)

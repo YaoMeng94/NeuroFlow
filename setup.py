@@ -50,7 +50,7 @@ class build_py(_build_py):
 
 metadata = {}
 if tuple(int(part) for part in setuptools.__version__.split(".")[:2]) < (61, 0):
-    metadata.update(name="neuroflow", version="0.4.13")
+    metadata.update(name="neuroflow", version="0.4.14")
 
 setup(
     package_dir={"": "code"},

@@ -4,6 +4,8 @@ import hashlib
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from pydicom import FileDataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
@@ -88,6 +90,50 @@ class DicomSortTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not empty"):
             sort_dicom(self.source, output, self.rules)
         self.assertEqual((output / "keep.txt").read_text(encoding="utf-8"), "keep")
+
+    def test_dicomdir_ids_rebase_to_selected_source_subfolder(self) -> None:
+        source = self.root / "export" / "SUBJECT"
+        series_dir = source / "SERIES"
+        series_dir.mkdir(parents=True)
+        image = series_dir / "IMAGE.DCM"
+        write_dicom(image, series_number=1, description="T1w", protocol="MPRAGE")
+        dicomdir = source.parent / "DICOMDIR"
+        dicomdir.write_bytes(b"synthetic directory index")
+        entries = [
+            SimpleNamespace(DirectoryRecordType="PATIENT"),
+            SimpleNamespace(
+                DirectoryRecordType="STUDY",
+                StudyInstanceUID="1.2.826.0.1.3680043.10.543.1",
+            ),
+            SimpleNamespace(
+                DirectoryRecordType="SERIES",
+                SeriesInstanceUID="1.2.826.0.1.3680043.10.543.1",
+                SeriesDescription="T1w", Modality="MR", SeriesNumber="1",
+            ),
+            SimpleNamespace(
+                DirectoryRecordType="IMAGE",
+                ReferencedFileID=["SUBJECT", "SERIES", "IMAGE.DCM"],
+            ),
+        ]
+        read_dicom = __import__("pydicom").dcmread
+
+        def dcmread(path, *args, **kwargs):
+            if Path(path) == dicomdir:
+                return SimpleNamespace(DirectoryRecordSequence=entries)
+            return read_dicom(path, *args, **kwargs)
+
+        with patch("neuroflow.dicom_sort.pydicom.dcmread", side_effect=dcmread):
+            preview = inspect_dicom(source, {
+                "version": 1,
+                "rules": [{
+                    "name": "T1", "category": "anat",
+                    "match": {"SeriesDescription": "^T1w$"},
+                }],
+            })
+
+        self.assertEqual(len(preview), 1)
+        self.assertEqual(preview[0]["status"], "matched")
+        self.assertEqual(preview[0]["files"], [image.resolve()])
 
 
 if __name__ == "__main__":
