@@ -83,7 +83,15 @@ jobs:
           $bitmap.Save("manual-assets/windows-film-sheet-app.png", [System.Drawing.Imaging.ImageFormat]::Png)
           $graphics.Dispose()
           $bitmap.Dispose()
-          [System.Windows.Forms.SendKeys]::SendWait("{PGDN}")
+          Add-Type @"
+          using System.Runtime.InteropServices;
+          public static class FilmSheetManualCapture {
+            [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+            [DllImport("user32.dll")] public static extern void mouse_event(int flags, int dx, int dy, int data, int extraInfo);
+          }
+          "@
+          [FilmSheetManualCapture]::SetCursorPos(180, 650) | Out-Null
+          [FilmSheetManualCapture]::mouse_event(0x0800, 0, 0, -1200, 0)
           Start-Sleep -Seconds 1
           $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
