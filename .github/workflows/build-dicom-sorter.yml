@@ -19,6 +19,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      - name: Check out previous Windows sorter source
+        if: runner.os == 'Windows'
+        uses: actions/checkout@v7
+        with:
+          ref: neuroflow-v0.4.13
+          path: previous-sorter-source
+          fetch-depth: 1
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
@@ -111,8 +118,6 @@ jobs:
       - name: Install prior version, upgrade, self-test, and uninstall the Windows package
         if: runner.os == 'Windows'
         shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
@@ -120,40 +125,23 @@ jobs:
           $installer = $installer.FullName
           $installDir = Join-Path $env:RUNNER_TEMP 'NeuroFlowSorterTest'
           $previousVersion = '0.4.13'
-          $previousTag = "neuroflow-v$previousVersion"
-          $previousAssetName = "NeuroFlowDICOMSorter-Windows-Setup-$previousVersion.exe"
-          $previousChecksumName = "$previousAssetName.sha256"
-          $headers = @{
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
+          $previousSource = Join-Path $env:GITHUB_WORKSPACE 'previous-sorter-source'
+          $previousEnv = Join-Path $env:RUNNER_TEMP 'neuroflow-previous-build-env'
+          $previousPython = Join-Path $previousEnv 'Scripts\python.exe'
+          python -m venv $previousEnv
+          Push-Location $previousSource
+          try {
+            & $previousPython -m pip install --disable-pip-version-check '.[standalone]'
+            if ($LASTEXITCODE -ne 0) { throw "Previous-version dependency installation exited with $LASTEXITCODE" }
+            & $previousPython code/packaging/build_standalone.py
+            if ($LASTEXITCODE -ne 0) { throw "Previous-version app build exited with $LASTEXITCODE" }
+            & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" code/packaging/windows/NeuroFlowDICOMSorter.iss
+            if ($LASTEXITCODE -ne 0) { throw "Previous-version installer build exited with $LASTEXITCODE" }
+          } finally {
+            Pop-Location
           }
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/YaoMeng94/NeuroFlow/releases/tags/$previousTag" -Headers $headers
-          $previousAsset = $release.assets | Where-Object name -eq $previousAssetName | Select-Object -First 1
-          if (-not $previousAsset) { throw "Previous-version installer $previousAssetName is missing from $previousTag" }
-          $previousChecksumAsset = $release.assets | Where-Object name -eq $previousChecksumName | Select-Object -First 1
-          if (-not $previousChecksumAsset) { throw "Checksum $previousChecksumName is missing from $previousTag" }
-          $previousInstaller = Join-Path $env:RUNNER_TEMP $previousAssetName
-          $previousChecksum = "$previousInstaller.sha256"
-          Invoke-WebRequest -Uri $previousAsset.url -Headers @{
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-            Accept = 'application/octet-stream'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          } -OutFile $previousInstaller
-          Invoke-WebRequest -Uri $previousChecksumAsset.url -Headers @{
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-            Accept = 'application/octet-stream'
-            'X-GitHub-Api-Version' = '2022-11-28'
-          } -OutFile $previousChecksum
-          $checksumLine = (Get-Content -LiteralPath $previousChecksum -Raw).Trim()
-          $checksumPattern = '^([A-Fa-f0-9]{64})\s+\*?' + [regex]::Escape($previousAssetName) + '$'
-          if ($checksumLine -match $checksumPattern) {
-            $expectedHash = $Matches[1].ToLowerInvariant()
-          } else {
-            throw "Invalid checksum manifest for $previousAssetName"
-          }
-          $downloadedHash = (Get-FileHash $previousInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($downloadedHash -ne $expectedHash) { throw "Checksum verification failed for $previousAssetName" }
+          $previousInstaller = Join-Path $previousSource "NeuroFlowDICOMSorter-Windows-Setup-$previousVersion.exe"
+          if (-not (Test-Path $previousInstaller)) { throw 'Previous-version installer was not created' }
           $installPrevious = Start-Process -FilePath $previousInstaller -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
           if ($installPrevious.ExitCode -ne 0) { throw "Previous-version installer exited with $($installPrevious.ExitCode)" }
           $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
