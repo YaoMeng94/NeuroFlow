@@ -10,6 +10,8 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +25,8 @@ jobs:
       - name: Install the standalone build dependencies
         run: python -m pip install ".[standalone]"
       - name: Build the desktop app
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: python code/packaging/build_standalone.py
       - name: Verify macOS bundle version metadata
         if: runner.os == 'macOS'

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
 import shutil
 import subprocess
@@ -85,7 +86,14 @@ def main() -> int:
 
     for tool, (repository, tag) in RELEASES.items():
         api_url = f"https://api.github.com/repos/{repository}/releases/tags/{tag}"
-        request = urllib.request.Request(api_url, headers={"User-Agent": "NeuroFlow-DICOM-Sorter-build", "Accept": "application/vnd.github+json"})
+        headers = {
+            "User-Agent": "NeuroFlow-DICOM-Sorter-build",
+            "Accept": "application/vnd.github+json",
+        }
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        request = urllib.request.Request(api_url, headers=headers)
         with urllib.request.urlopen(request, timeout=30) as response:
             release = json.load(response)
         asset = _select_asset(release.get("assets", []), tool, system, arch)
