@@ -15,7 +15,7 @@ In **Scanner DICOM folder**, select the folder containing the copied scanner DIC
 
 The app suggests a separate `_sorted` folder beside the source. You can change it, but choose a new or empty folder. Sorting copies the files; the scanner export remains unchanged.
 
-![Sorter window with the synthetic scanner folder selected](images/dicom-sorter-main.png)
+![Sorter main window before a scanner folder is selected](images/dicom-sorter-main.png)
 
 ## 3. Preview and review sequences
 
