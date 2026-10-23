@@ -9,12 +9,12 @@ are installed separately.
 
 The `neuroflow-v0.4.14` tag and unpublished draft at commit `d258c08` are the
 previous candidate; they predate the latest DICOM conversion changes. Current
-acceptance source is on `deployment-acceptance` as version `0.4.15`. Follow
+acceptance source is on `deployment-acceptance` as version `0.4.16`. Follow
 the [branch test runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/test-neuroflow.yml?query=branch%3Adeployment-acceptance)
 and [native platform builds](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
 for current artifacts. They are Actions artifacts, not release assets.
 Linux/HPC install,
-upgrade, uninstall, and glibc 2.17 checks also passed on node-1. No 0.4.15 tag
+upgrade, uninstall, and glibc 2.17 checks also passed on node-1. No 0.4.16 tag
 or draft release exists yet. The macOS apps are not notarized; follow the
 controlled internal-test steps in `INSTALL_MACOS.md` only for the previous
 0.4.14 draft artifacts.
@@ -24,10 +24,10 @@ controlled internal-test steps in `INSTALL_MACOS.md` only for the previous
 Use only a versioned, checksum-verified package for your operating system. No
 Python installation is needed to run a published standalone desktop package.
 
-- **macOS:** no current release asset is published. Use only a 0.4.15 artifact
+- **macOS:** no current release asset is published. Use only a 0.4.16 artifact
   from the branch build workflow for internal acceptance, verify its checksum,
   and follow `INSTALL_MACOS.md`.
-- **Windows:** no current release asset is published. Use only a 0.4.15
+- **Windows:** no current release asset is published. Use only a 0.4.16
   artifact from the branch build workflow for internal acceptance and verify
   its checksum before running the sorter installer. Controller setup is in
   `INSTALL_WINDOWS.md`.
@@ -73,8 +73,7 @@ scanner-export_sorted/
     _unmatched/
 ```
 
-The included sequence rules were derived from one Prisma protocol. Use
-**Advanced: change sequence rules** to open or select the JSON rule file.
+The default rule preset recognizes common MRI sequence families across vendors using Series Description, Protocol Name, and Sequence Name. The rule format also supports additional DICOM acquisition tags. Ambiguous or unmatched series still require review. Open **Advanced: change sequence rules** to edit the JSON rules or select the included Prisma protocol preset. The general rules are starting points and should be reviewed against each scanner protocol.
 
 ## Convert sorted subjects to BIDS
 
@@ -89,7 +88,7 @@ When **All subjects** is selected, participants are converted one at a time
 into the same BIDS output folder. Temporary staged DICOM files are removed
 after each participant completes.
 
-The 0.4.15 macOS and Windows Actions artifacts include
+The 0.4.16 macOS and Windows Actions artifacts include
 `dcm2bids` 3.2.0,
 `dcm2bids_helper`, and `dcm2niix` 1.0.20260724. No separate converter install
 is needed. The existing 0.4.14 draft packages predate this change and still

@@ -28,6 +28,12 @@ _TAGS = {
     "ProtocolName": "ProtocolName",
     "Modality": "Modality",
     "SequenceName": "SequenceName",
+    "ImageType": "ImageType",
+    "ScanningSequence": "ScanningSequence",
+    "SequenceVariant": "SequenceVariant",
+    "MRAcquisitionType": "MRAcquisitionType",
+    "EchoTime": "EchoTime",
+    "InversionTime": "InversionTime",
 }
 
 
@@ -52,18 +58,29 @@ def load_rules(path: Path) -> dict[str, Any]:
         if not isinstance(rule.get("category"), str) or not rule["category"].strip():
             raise ValueError(f"Rule {index} needs a non-empty category")
         match = rule.get("match")
-        if not isinstance(match, dict) or not match:
-            raise ValueError(f"Rule {index} needs at least one match field")
-        unknown = set(match) - set(_TAGS)
-        if unknown:
-            raise ValueError(f"Rule {index} uses unsupported DICOM fields: {', '.join(sorted(unknown))}")
-        for field, pattern in match.items():
-            if not isinstance(pattern, str) or not pattern:
-                raise ValueError(f"Rule {index} field {field} needs a non-empty regex")
-            try:
-                re.compile(pattern, re.IGNORECASE)
-            except re.error as exc:
-                raise ValueError(f"Rule {index} has invalid regex for {field}: {exc}") from exc
+        match_any = rule.get("match_any")
+        clauses = []
+        if match is not None:
+            if not isinstance(match, dict) or not match:
+                raise ValueError(f"Rule {index} match must be a non-empty object")
+            clauses.append(match)
+        if match_any is not None:
+            if not isinstance(match_any, list) or not match_any or any(not isinstance(item, dict) or not item for item in match_any):
+                raise ValueError(f"Rule {index} match_any must be a non-empty list of match objects")
+            clauses.extend(match_any)
+        if not clauses:
+            raise ValueError(f"Rule {index} needs match or match_any")
+        for clause in clauses:
+            unknown = set(clause) - set(_TAGS)
+            if unknown:
+                raise ValueError(f"Rule {index} uses unsupported DICOM fields: {', '.join(sorted(unknown))}")
+            for field, pattern in clause.items():
+                if not isinstance(pattern, str) or not pattern:
+                    raise ValueError(f"Rule {index} field {field} needs a non-empty regex")
+                try:
+                    re.compile(pattern, re.IGNORECASE)
+                except re.error as exc:
+                    raise ValueError(f"Rule {index} has invalid regex for {field}: {exc}") from exc
     return data
 
 
@@ -82,7 +99,8 @@ def _read_file(path: Path) -> DicomFile | None:
             force=False,
             specific_tags=[
                 "StudyInstanceUID", "SeriesInstanceUID", "PatientID", "SeriesDescription",
-                "ProtocolName", "Modality", "SequenceName", "SeriesNumber",
+                "ProtocolName", "Modality", "SequenceName", "SeriesNumber", "ImageType",
+                "ScanningSequence", "SequenceVariant", "MRAcquisitionType", "EchoTime", "InversionTime",
             ],
         )
     except Exception:
@@ -292,7 +310,14 @@ def inspect_dicom(
         values = files[0].values
         matches = []
         for rule in rules["rules"]:
-            if all(re.search(pattern, values.get(field, ""), re.IGNORECASE) for field, pattern in rule["match"].items()):
+            clauses = []
+            if rule.get("match"):
+                clauses.append(rule["match"])
+            clauses.extend(rule.get("match_any", []))
+            if any(
+                all(re.search(pattern, values.get(field, ""), re.IGNORECASE) for field, pattern in clause.items())
+                for clause in clauses
+            ):
                 matches.append(rule)
         if len(matches) == 1:
             category = _safe_name(matches[0]["category"], "sorted")

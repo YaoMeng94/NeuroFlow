@@ -107,18 +107,18 @@ For the Windows controller bundle and per-user Start Menu launcher, see
 The existing `neuroflow-v0.4.14` tag and unpublished draft release refer to
 older source at `d258c08`; those assets do not include the latest converter
 workflow changes. The `deployment-acceptance` branch carries the distinct
-`0.4.15` candidate. Linux/HPC acceptance passed on the node-1 glibc 2.17 test
+`0.4.16` candidate. Linux/HPC acceptance passed on the node-1 glibc 2.17 test
 account, including install, upgrade, uninstall, DICOM/BIDS preflights, and
 BIDS-only planning. The candidate's native platform artifacts are generated
 by the branch build workflow and remain Actions artifacts, not release assets.
 See the [deployment-acceptance build runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
 and [test runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/test-neuroflow.yml?query=branch%3Adeployment-acceptance).
-No release tag or draft was created for 0.4.15. See
+No release tag or draft was created for 0.4.16. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific acceptance status.
 Public macOS distribution remains unavailable until Developer ID signing and
 notarization are configured. The 0.4.14 draft must not be presented as the
-0.4.15 candidate.
+0.4.16 candidate.
 
 ## Site Configuration
 
@@ -136,11 +136,14 @@ NeuroFlow job-state directory.
 
 ## DICOM Notes
 
-The bundled DICOM sorter preset and dcm2bids configuration are starting points
-for the Siemens Prisma protocol used during development, not universal
-mappings. Review or replace them for each scanner/protocol before conversion.
+The bundled DICOM sorter includes a general MRI sequence-family preset and an
+optional Siemens Prisma protocol preset. The dcm2bids configuration is tuned to
+the observed Prisma data. Review or adapt these mappings for each scanner and
+protocol before sorting or conversion.
 The sorter preserves the source export and copies selected series; conversion
 must be validated as a BIDS dataset before downstream processing.
+
+Bilingual workflow manuals: [English](docs/DICOM_SORTER_MANUAL_EN.md) · [简体中文](docs/DICOM_SORTER_MANUAL_ZH.md).
 
 ## Development Checks
 

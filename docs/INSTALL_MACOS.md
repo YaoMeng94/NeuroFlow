@@ -8,11 +8,11 @@ tedana, QSIPrep, QSIRecon, Workbench, or Apptainer images.
 ## Current distribution status
 
 The `0.4.14` draft artifacts at commit `d258c08` are superseded and predate
-the current conversion changes. Native GitHub Actions builds for the `0.4.15`
+the current conversion changes. Native GitHub Actions builds for the `0.4.16`
 acceptance branch run on both ARM64 and Intel. Check the
 [branch build workflow](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
 for current artifacts and results. They are Actions artifacts, not published
-release assets; no 0.4.15 release tag exists.
+release assets; no 0.4.16 release tag exists.
 
 The apps are **not notarized**. No valid code-signing identity was available on
 the build Mac when checked on 2026-10-22. Public distribution requires a
@@ -25,13 +25,13 @@ metadata and is not a release artifact.
 
 ## Internal test steps
 
-1. For internal acceptance, download a 0.4.15 macOS sorter artifact from the
+1. For internal acceptance, download a 0.4.16 macOS sorter artifact from the
    branch build workflow and locate the matching `.zip` and `.zip.sha256`
    files. Do not use this archive for public distribution.
 2. Verify the archive checksum before opening it:
 
    ```bash
-   archive="NeuroFlowDICOMSorter-macOS-ARM64-0.4.15.zip"
+   archive="NeuroFlowDICOMSorter-macOS-ARM64-0.4.16.zip"
    shasum -a 256 -c "$archive.sha256"
    ```
 

@@ -28,7 +28,8 @@ from .bids_finalize import finalize_bids
 
 
 APP_NAME = "NeuroFlow DICOM Sorter"
-PRESET_NAME = "dicom_sort_rules_20261016.json"
+PRESET_NAME = "dicom_sort_rules_general.json"
+PRISMA_PRESET_NAME = "dicom_sort_rules_20261016.json"
 BIDS_CONFIG_NAME = "dcm2bids_config_prisma.json"
 ALL_SUBJECTS_OPTION = "All subjects"
 TABLE_COLUMNS = ("subject", "series", "description", "protocol", "files", "category", "status")
@@ -42,13 +43,13 @@ def _user_config_dir() -> Path:
     return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "neuroflow-dicom-sorter"
 
 
-def _bundled_preset() -> Path:
+def _bundled_preset(name: str = PRESET_NAME) -> Path:
     frozen_root = getattr(sys, "_MEIPASS", None)
     if frozen_root:
-        candidate = Path(frozen_root) / "neuroflow" / "data" / PRESET_NAME
+        candidate = Path(frozen_root) / "neuroflow" / "data" / name
         if candidate.is_file():
             return candidate
-    return Path(str(files("neuroflow").joinpath("data", PRESET_NAME)))
+    return Path(str(files("neuroflow").joinpath("data", name)))
 
 
 def _bundled_converter(name: str) -> Path | None:
@@ -66,6 +67,14 @@ def _install_user_preset() -> Path:
     if not destination.exists():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(_bundled_preset(), destination)
+    return destination
+
+
+def _install_prisma_preset() -> Path:
+    destination = _user_config_dir() / PRISMA_PRESET_NAME
+    if not destination.exists():
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(_bundled_preset(PRISMA_PRESET_NAME), destination)
     return destination
 
 
@@ -115,6 +124,7 @@ class SorterWindow:
         self.session_var = tk.StringVar()
         self.bids_subject_var = tk.StringVar()
         self.rules_var = tk.StringVar(value=str(default_rules))
+        self.prisma_rules_path = _install_prisma_preset()
         self.status_var = tk.StringVar(value="Choose a scanner export folder and preview its DICOM series.")
         self.review_var = tk.BooleanVar(value=False)
 
@@ -152,11 +162,12 @@ class SorterWindow:
         self.advanced_frame = ttk.LabelFrame(outer, text="Sequence rule preset", padding=10)
         ttk.Label(
             self.advanced_frame,
-            text="The included preset is tuned for the observed Prisma protocol. Choose another JSON rule file for a different scanner or protocol.",
+            text="The general preset recognizes common MRI sequence families across vendors. Matches still need review when names are ambiguous. The observed Prisma protocol preset is also available.",
             wraplength=900,
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
         self._path_row(self.advanced_frame, "Rule preset", self.rules_var, self._choose_rules, 1)
         ttk.Button(self.advanced_frame, text="Open rule file", command=self._open_rules).grid(row=2, column=1, sticky="w", pady=(6, 0))
+        ttk.Button(self.advanced_frame, text="Use Prisma preset", command=lambda: self._select_rules(self.prisma_rules_path)).grid(row=3, column=1, sticky="w", pady=(6, 0))
         ttk.Label(
             self.advanced_frame,
             text="Rule files can be edited in a text editor. Save changes, then preview again.",
@@ -275,6 +286,9 @@ class SorterWindow:
                 subprocess.Popen(["xdg-open", str(output)])
         except OSError as exc:
             messagebox.showerror(APP_NAME, f"Could not open the output folder: {exc}", parent=self.root)
+
+    def _select_rules(self, path: Path) -> None:
+        self.rules_var.set(str(path))
 
     def _choose_rules(self) -> None:
         selected = filedialog.askopenfilename(
@@ -525,6 +539,8 @@ class SorterWindow:
                                "-c", str(Path(config_text).expanduser()), "-o", str(output)]
                     if session:
                         command.extend(["-s", session])
+                    if getattr(sys, "frozen", False) and sys.platform == "win32" and _bundled_converter("dcm2bids") == Path(executable):
+                        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
                     result = subprocess.run(command, capture_output=True, text=True, env=env)
                     if result.returncode:
                         details = (result.stderr or result.stdout or "No converter details were returned").strip()
@@ -616,6 +632,8 @@ def self_test() -> None:
             raise RuntimeError("Standalone package is missing converter tool(s): " + ", ".join(missing))
         env = os.environ.copy()
         env["PATH"] = str(Path(sys._MEIPASS) / "tools") + os.pathsep + env.get("PATH", "")
+        if sys.platform == "win32":
+            env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
         subprocess.run([str(_bundled_converter("dcm2bids")), "--version"], capture_output=True, text=True, env=env, check=True)
         subprocess.run([str(_bundled_converter("dcm2niix")), "-h"], capture_output=True, text=True, env=env, check=True)
     print(f"{APP_NAME} {__version__}: resources and DICOM sorter imports are ready ({len(rules['rules'])} rules)")

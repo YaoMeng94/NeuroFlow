@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "description": "General MRI series preset. Uses common sequence-family names across vendors and standard sequence metadata fields. Review unmatched and overlapping matches before sorting; adapt the rules to local protocols.",
+  "rules": [
+    {
+      "name": "t1_weighted_anatomical",
+      "category": "anat",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:t1w|t1 weighted|mprage|mp-rage|bravo|spgr|fspgr|ir-spgr|tfl|flash)"
+        },
+        {
+          "ProtocolName": "(?:t1w|t1 weighted|mprage|mp-rage|bravo|spgr|fspgr|ir-spgr|tfl|flash)"
+        },
+        {
+          "SequenceName": "(?:mprage|spgr|fspgr|tfl|flash)"
+        }
+      ]
+    },
+    {
+      "name": "t2_weighted_anatomical",
+      "category": "anat",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:t2w|t2 weighted|t2 tse|t2 fse|space|cube|vistas)"
+        },
+        {
+          "ProtocolName": "(?:t2w|t2 weighted|t2 tse|t2 fse|space|cube|vistas)"
+        }
+      ]
+    },
+    {
+      "name": "flair_anatomical",
+      "category": "anat",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:flair|dark.?fluid)"
+        },
+        {
+          "ProtocolName": "(?:flair|dark.?fluid)"
+        }
+      ]
+    },
+    {
+      "name": "diffusion_weighted",
+      "category": "dwi",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:dwi|diffusion|dti|diff[_ -]?(?:dir|trace)|ep2d.?diff)"
+        },
+        {
+          "ProtocolName": "(?:dwi|diffusion|dti|diff[_ -]?(?:dir|trace)|ep2d.?diff)"
+        },
+        {
+          "SequenceName": "ep_b.*"
+        }
+      ]
+    },
+    {
+      "name": "functional_bold",
+      "category": "func",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:bold|fmri|f.?mri|rest(?:ing)?|task.?fmri|functional)"
+        },
+        {
+          "ProtocolName": "(?:bold|fmri|f.?mri|rest(?:ing)?|task.?fmri|functional)"
+        }
+      ]
+    },
+    {
+      "name": "fieldmap",
+      "category": "fmap",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:field.?map|fmap|b0.?map|spin.?echo.*(?:ap|pa))"
+        },
+        {
+          "ProtocolName": "(?:field.?map|fmap|b0.?map|spin.?echo.*(?:ap|pa))"
+        }
+      ]
+    },
+    {
+      "name": "localizer_or_scout",
+      "category": "localizer",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:locali[sz]er|scout|survey|pilot)"
+        },
+        {
+          "ProtocolName": "(?:locali[sz]er|scout|survey|pilot)"
+        }
+      ]
+    },
+    {
+      "name": "physiological_recording",
+      "category": "physio",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:physio|resp(?:iration)?|pulse.?ox|ecg|cardiac.?trigger)"
+        },
+        {
+          "ProtocolName": "(?:physio|resp(?:iration)?|pulse.?ox|ecg|cardiac.?trigger)"
+        }
+      ]
+    },
+    {
+      "name": "susceptibility_weighted",
+      "category": "anat",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:swi|susceptibility weighted|ven.?bold)"
+        },
+        {
+          "ProtocolName": "(?:swi|susceptibility weighted|ven.?bold)"
+        }
+      ]
+    },
+    {
+      "name": "perfusion_asl",
+      "category": "perf",
+      "match_any": [
+        {
+          "SeriesDescription": "(?:asl|pcasl|casl|arterial spin)"
+        },
+        {
+          "ProtocolName": "(?:asl|pcasl|casl|arterial spin)"
+        }
+      ]
+    }
+  ]
+}

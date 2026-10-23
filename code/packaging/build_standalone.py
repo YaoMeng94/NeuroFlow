@@ -12,7 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 ENTRY_POINT = ROOT / "code" / "packaging" / "run_standalone.py"
-RULES = ROOT / "code" / "neuroflow" / "data" / "dicom_sort_rules_20261016.json"
+RULES = ROOT / "code" / "neuroflow" / "data" / "dicom_sort_rules_general.json"
+PRISMA_RULES = ROOT / "code" / "neuroflow" / "data" / "dicom_sort_rules_20261016.json"
 BIDS_CONFIG = ROOT / "code" / "neuroflow" / "data" / "dcm2bids_config_prisma.json"
 CONVERTER_TOOLS = ROOT / "build" / "converter-tools"
 
@@ -40,6 +41,9 @@ def finalize_macos_bundle(version: str) -> None:
     with plist_path.open("wb") as stream:
         plistlib.dump(plist, stream, sort_keys=True)
 
+    # Cloud-synced folders can attach Finder resource metadata to generated files,
+    # which causes codesign to reject an otherwise valid app bundle.
+    subprocess.run(["xattr", "-cr", str(app)], check=True)
     identity = os.environ.get("NEUROFLOW_CODESIGN_IDENTITY", "-")
     sign = ["codesign", "--force", "--deep", "--sign", identity]
     if identity != "-":
@@ -73,6 +77,7 @@ def main() -> int:
         "--workpath", str(ROOT / "build" / "standalone_sorter"),
         "--distpath", str(ROOT / "dist" / "standalone_sorter"),
         "--add-data", f"{RULES}{os.pathsep}neuroflow/data",
+        "--add-data", f"{PRISMA_RULES}{os.pathsep}neuroflow/data",
         "--add-data", f"{BIDS_CONFIG}{os.pathsep}neuroflow/data",
     ]
     for tool in sorted(CONVERTER_TOOLS.iterdir()):

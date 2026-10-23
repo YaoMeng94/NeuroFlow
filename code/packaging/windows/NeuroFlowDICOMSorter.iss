@@ -1,5 +1,5 @@
 #define AppName "NeuroFlow DICOM Sorter"
-#define AppVersion "0.4.15"
+#define AppVersion "0.4.16"
 
 [Setup]
 AppId={{EBD8AD75-1289-4F50-A5E9-2E1D7F41E224}
