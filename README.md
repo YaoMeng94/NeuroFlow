@@ -104,23 +104,21 @@ The versioned Linux/HPC release bundle is built with
 For the Windows controller bundle and per-user Start Menu launcher, see
 `docs/INSTALL_WINDOWS.md`. It uses an offline Python wheelhouse and requires
 64-bit CPython 3.11; the DICOM sorter remains a separate standalone installer.
-The `neuroflow-v0.4.14` candidate at `d258c08` passed the Linux install,
-upgrade, uninstall, glibc 2.17, sorter GUI, synthetic DICOM-to-BIDS, and
-unit/web checks in [Actions test run 39713726335](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726335).
-Native Windows and macOS builds, installer smoke tests, and Linux/HPC bundle
-checks passed in [Actions build run 39713726327](https://github.com/YaoMeng94/NeuroFlow/actions/runs/39713726327).
-Both workflows ran on the versioned tag. The [0.4.14 GitHub Release](https://github.com/YaoMeng94/NeuroFlow/releases/tag/untagged-3d59757e0b66ec33ac01)
-is an unpublished draft containing versioned platform bundles and checksums;
-it is for controlled internal testing, not public distribution. GitHub serves
-this draft at its generated `untagged-<release-id>` URL; if it is published,
-update the installation guides to use the canonical `neuroflow-v0.4.14`
-release URL. The older
-`neuroflow-v0.4.13` draft remains unchanged and is tied to `edb38b1`. See
+The existing `neuroflow-v0.4.14` tag and unpublished draft release refer to
+older source at `d258c08`; those assets do not include the latest converter
+workflow changes. The `deployment-acceptance` branch carries the distinct
+`0.4.15` candidate. Linux/HPC acceptance passed on the node-1 glibc 2.17 test
+account, including install, upgrade, uninstall, DICOM/BIDS preflights, and
+BIDS-only planning. The candidate's native platform artifacts are generated
+by the branch build workflow and remain Actions artifacts, not release assets.
+See the [deployment-acceptance build runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
+and [test runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/test-neuroflow.yml?query=branch%3Adeployment-acceptance).
+No release tag or draft was created for 0.4.15. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
-`docs/DICOM_SORTER_START_HERE.md` for platform-specific test guidance. Public
-macOS distribution still requires Developer ID signing and notarization. A
-read-only planning smoke test also accepted an existing BIDS dataset for all
-three modalities without invoking DICOM conversion or launching processing.
+`docs/DICOM_SORTER_START_HERE.md` for platform-specific acceptance status.
+Public macOS distribution remains unavailable until Developer ID signing and
+notarization are configured. The 0.4.14 draft must not be presented as the
+0.4.15 candidate.
 
 ## Site Configuration
 

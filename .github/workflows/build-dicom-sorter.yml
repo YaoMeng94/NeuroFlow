@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - deployment-acceptance
     tags:
       - "neuroflow-v*"
 
