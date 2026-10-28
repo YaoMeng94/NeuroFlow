@@ -19,12 +19,23 @@ def bundled_pipeline_root() -> Path:
     raise PlanError("The NeuroFlow pipeline bundle is missing from this installation")
 
 
+def bundled_atlas_root() -> Path:
+    """Find the packaged HCP standard-mesh references used by ANAT and BOLD."""
+    root = Path(__file__).resolve().parent / "data" / "atlases" / "standard_mesh_atlases"
+    if root.is_dir():
+        return root
+    raise PlanError("The NeuroFlow standard mesh atlas bundle is missing from this installation")
+
+
 def initialize_site_profile(path: Path) -> Path:
     """Write a per-user profile without replacing an existing configuration."""
     if path.exists():
         raise PlanError(f"Refusing to replace site profile: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    profile = SiteProfile(pipeline_root=str(bundled_pipeline_root()))
+    profile = SiteProfile(
+        pipeline_root=str(bundled_pipeline_root()),
+        atlas_root=str(bundled_atlas_root()),
+    )
     path.write_text(json.dumps(profile.__dict__, indent=2) + "\n")
     return path
 
@@ -48,9 +59,15 @@ def refresh_site_profile(path: Path) -> bool:
         if not is_bundled:
             return False
         new_root = bundled_pipeline_root().resolve()
-        if old_root.resolve() == new_root:
+        changed = False
+        if old_root.resolve() != new_root:
+            profile["pipeline_root"] = str(new_root)
+            changed = True
+        if not profile.get("atlas_root"):
+            profile["atlas_root"] = str(bundled_atlas_root())
+            changed = True
+        if not changed:
             return False
-        profile["pipeline_root"] = str(new_root)
         temporary = path.with_name(path.name + ".tmp")
         temporary.write_text(json.dumps(profile, indent=2) + "\n")
         temporary.chmod(path.stat().st_mode & 0o777)

@@ -65,6 +65,9 @@ class SiteProfile:
                 raise ValueError(f"unknown site profile keys: {', '.join(sorted(unknown))}")
             if "atlas_datasets" in data and not isinstance(data["atlas_datasets"], dict):
                 raise ValueError("atlas_datasets must be a name-to-path object")
+            bundled_atlas_root = Path(__file__).resolve().parent / "data" / "atlases" / "standard_mesh_atlases"
+            if not data.get("atlas_root") and bundled_atlas_root.is_dir():
+                data["atlas_root"] = str(bundled_atlas_root)
             return cls(**data)
         except (OSError, TypeError, ValueError) as exc:
             raise PlanError(f"Cannot load site profile {path}: {exc}") from exc

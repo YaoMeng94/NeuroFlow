@@ -107,27 +107,29 @@ For the Windows controller bundle and per-user Start Menu launcher, see
 The existing `neuroflow-v0.4.14` tag and unpublished draft release refer to
 older source at `d258c08`; those assets do not include the latest converter
 workflow changes. The `deployment-acceptance` branch carries the distinct
-`0.4.16` candidate. Linux/HPC acceptance passed on the node-1 glibc 2.17 test
-account, including install, upgrade, uninstall, DICOM/BIDS preflights, and
-BIDS-only planning. The candidate's native platform artifacts are generated
-by the branch build workflow and remain Actions artifacts, not release assets.
+`0.4.17` candidate. Its Linux/HPC bundle is built as an offline Actions
+artifact, and the 0.4.17 bundle has passed an isolated install, doctor, and GUI
+smoke check on node-2. The 0.4.16 node-1 checks remain the previous Linux
+acceptance record. Version 0.4.17 is not tagged or published as a release;
+platform artifacts remain Actions artifacts, not release assets.
 See the [deployment-acceptance build runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
 and [test runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/test-neuroflow.yml?query=branch%3Adeployment-acceptance).
-No release tag or draft was created for 0.4.16. See
+No release tag or draft was created for 0.4.17. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific acceptance status.
 Public macOS distribution remains unavailable until Developer ID signing and
 notarization are configured. The 0.4.14 draft must not be presented as the
-0.4.16 candidate.
+0.4.17 candidate.
 
 ## Site Configuration
 
 `neuroflow init-site` creates a per-user JSON profile. Configure only the tools
 and images required by selected workflows, such as FreeSurfer, Workbench,
 newMSM, fMRIPrep, tedana, QSIPrep, QSIRecon, Nextflow, and DICOM conversion
-utilities. Use absolute paths readable/executable by the user. External atlas
-datasets can be placed in a shared read-only location; the Glasser360
-BIDS-Atlas resource in `resources/atlases/Glasser360/` is included.
+utilities. Use absolute paths readable/executable by the user. NeuroFlow
+bundles the HCP standard-mesh resources, Glasser360, and Schaefer2018 MNI 2 mm
+atlases; other external atlas datasets can be placed in a shared read-only
+location.
 
 For HPC use, administrators may provide versioned images and shared reference
 assets in read-only locations. Users still need read access to BIDS inputs and

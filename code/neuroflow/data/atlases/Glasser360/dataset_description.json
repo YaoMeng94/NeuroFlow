@@ -1,0 +1,11 @@
+{
+  "Name": "Glasser360 BIDS-Atlas dataset",
+  "BIDSVersion": "1.10.0",
+  "DatasetType": "derivative",
+  "GeneratedBy": [
+    {
+      "Name": "Prisma DWI atlas packager",
+      "Version": "0.1.0"
+    }
+  ]
+}

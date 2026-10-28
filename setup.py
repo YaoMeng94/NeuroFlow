@@ -50,12 +50,12 @@ class build_py(_build_py):
 
 metadata = {}
 if tuple(int(part) for part in setuptools.__version__.split(".")[:2]) < (61, 0):
-    metadata.update(name="neuroflow", version="0.4.15")
+    metadata.update(name="neuroflow", version="0.4.17")
 
 setup(
     package_dir={"": "code"},
     packages=find_packages(where="code", include=["neuroflow*"], exclude=["neuroflow.tests*"]),
-    package_data={"neuroflow": ["templates/*.html", "static/*.css", "data/*.json"]},
+    package_data={"neuroflow": ["templates/*.html", "static/*.css", "data/*.json", "data/atlases/**/*"]},
     include_package_data=True,
     cmdclass={"build_py": build_py},
     **metadata,

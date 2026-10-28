@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neuroflow"
-version = "0.4.16"
+version = "0.4.17"
 description = "Local web and CLI controller for multimodal BIDS processing"
 requires-python = ">=3.10"
 dependencies = [
@@ -53,4 +53,4 @@ where = ["code"]
 include = ["neuroflow*"]
 
 [tool.setuptools.package-data]
-neuroflow = ["templates/*.html", "static/*.css", "data/*.json"]
+neuroflow = ["templates/*.html", "static/*.css", "data/*.json", "data/atlases/**/*"]

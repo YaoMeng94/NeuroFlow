@@ -147,7 +147,8 @@ done
 if printf '%s\n' "${ATLASES[@]}" | grep -Fxq Glasser360 \
     && { ((${#ATLAS_DATASETS[@]} == 0)) \
         || ! printf '%s\n' "${ATLAS_DATASETS[@]}" | sed 's/=.*//' | grep -Fxq Glasser360; }; then
-    bundled_glasser="$SCRIPT_DIR/../../../resources/atlases/Glasser360"
+    bundled_glasser="$SCRIPT_DIR/../../data/atlases/Glasser360"
+    [[ -d "$bundled_glasser" ]] || bundled_glasser="$SCRIPT_DIR/../../../resources/atlases/Glasser360"
     if [[ -d "$bundled_glasser" ]]; then
         ATLAS_DATASETS+=("Glasser360=$bundled_glasser")
     fi

@@ -30,6 +30,10 @@ jobs:
               "neuroflow/pipelines/anat/run_anat_bidsapp.sh",
               "neuroflow/pipelines/bold/run_bold_bidsapp.sh",
               "neuroflow/pipelines/dwi/run_dwi_bidsapp.sh",
+              "neuroflow/data/atlases/standard_mesh_atlases/Atlas_ROIs.2.nii.gz",
+              "neuroflow/data/atlases/standard_mesh_atlases/L.refsulc.164k_fs_LR.shape.gii",
+              "neuroflow/data/atlases/Glasser360/dataset_description.json",
+              "neuroflow/data/atlases/Schaefer2018_MNI152_2mm/Schaefer2018_1000Parcels_17Networks_order_FSLMNI152_2mm.nii.gz",
           }
           missing = required - names
           if missing:
@@ -101,3 +105,27 @@ jobs:
           python code/pipelines/dwi/test_verify_dwi_metrics.py
           bash code/scripts/test_build_hpc_wheelhouse.sh
           bash code/scripts/test_install_neuroflow_hpc.sh
+
+  linux-offline-bundle:
+    needs: linux-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Build the offline Linux/HPC bundle
+        run: |
+          mkdir -p dist/wheel dist/linux-bundle
+          python -m pip wheel --no-deps . --wheel-dir dist/wheel
+          wheel="$(find dist/wheel -maxdepth 1 -name 'neuroflow-*.whl' -print -quit)"
+          wheelhouse="$RUNNER_TEMP/neuroflow-wheelhouse"
+          bash code/scripts/build_hpc_wheelhouse.sh "$wheel" "$wheelhouse" pipeline
+          bash code/scripts/package_neuroflow_linux.sh "$wheelhouse" dist/linux-bundle
+          ls -lh dist/linux-bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeuroFlow-Linux-HPC-${{ github.sha }}
+          path: dist/linux-bundle/NeuroFlow-Linux-x86_64-cp311-glibc217-*.tar.gz*
+          if-no-files-found: error
+          retention-days: 90
