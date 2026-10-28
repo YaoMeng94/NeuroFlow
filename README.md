@@ -107,19 +107,20 @@ For the Windows controller bundle and per-user Start Menu launcher, see
 The existing `neuroflow-v0.4.14` tag and unpublished draft release refer to
 older source at `d258c08`; those assets do not include the latest converter
 workflow changes. The `deployment-acceptance` branch carries the distinct
-`0.4.17` candidate. Its Linux/HPC bundle is built as an offline Actions
-artifact, and the 0.4.17 bundle has passed an isolated install, doctor, and GUI
-smoke check on node-2. The 0.4.16 node-1 checks remain the previous Linux
-acceptance record. Version 0.4.17 is not tagged or published as a release;
-platform artifacts remain Actions artifacts, not release assets.
+`0.4.18` candidate. Its atlas NIfTI files are tracked in Git so clean builds
+include the complete atlas set. The 0.4.17 bundle passed an isolated install,
+doctor, and GUI smoke check on node-2; 0.4.18 is being rebuilt and rechecked.
+The 0.4.16 Linux checks remain the earlier acceptance record. Version 0.4.18
+is not tagged or published as a release; platform artifacts remain Actions
+artifacts, not release assets.
 See the [deployment-acceptance build runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/build-dicom-sorter.yml?query=branch%3Adeployment-acceptance)
 and [test runs](https://github.com/YaoMeng94/NeuroFlow/actions/workflows/test-neuroflow.yml?query=branch%3Adeployment-acceptance).
-No release tag or draft was created for 0.4.17. See
+No release tag or draft was created for 0.4.18. See
 `docs/INSTALL_MACOS.md`, `docs/INSTALL_WINDOWS.md`, and
 `docs/DICOM_SORTER_START_HERE.md` for platform-specific acceptance status.
 Public macOS distribution remains unavailable until Developer ID signing and
 notarization are configured. The 0.4.14 draft must not be presented as the
-0.4.17 candidate.
+0.4.18 candidate.
 
 ## Site Configuration
 
