@@ -15,7 +15,10 @@
         {
           "SequenceName": "(?:mprage|spgr|fspgr|tfl|flash)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "t2_weighted_anatomical",
@@ -27,7 +30,10 @@
         {
           "ProtocolName": "(?:t2w|t2 weighted|t2 tse|t2 fse|space|cube|vistas)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "flair_anatomical",
@@ -39,7 +45,10 @@
         {
           "ProtocolName": "(?:flair|dark.?fluid)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "diffusion_weighted",
@@ -54,7 +63,10 @@
         {
           "SequenceName": "ep_b.*"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "functional_bold",
@@ -66,7 +78,10 @@
         {
           "ProtocolName": "(?:bold|fmri|f.?mri|rest(?:ing)?|task.?fmri|functional)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "fieldmap",
@@ -78,7 +93,10 @@
         {
           "ProtocolName": "(?:field.?map|fmap|b0.?map|spin.?echo.*(?:ap|pa))"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "localizer_or_scout",
@@ -90,7 +108,10 @@
         {
           "ProtocolName": "(?:locali[sz]er|scout|survey|pilot)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "physiological_recording",
@@ -114,7 +135,10 @@
         {
           "ProtocolName": "(?:swi|susceptibility weighted|ven.?bold)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     },
     {
       "name": "perfusion_asl",
@@ -126,7 +150,10 @@
         {
           "ProtocolName": "(?:asl|pcasl|casl|arterial spin)"
         }
-      ]
+      ],
+      "exclude": {
+        "SeriesDescription": "(?:physio|physiolog|pmu)"
+      }
     }
   ]
 }

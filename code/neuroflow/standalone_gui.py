@@ -89,7 +89,7 @@ def _install_user_bids_config() -> Path:
 class SorterWindow:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title(APP_NAME)
+        self.root.title(f"{APP_NAME} v{__version__}")
         self.root.minsize(980, 680)
         self.root.geometry("1120x860")
         self.events: queue.Queue[tuple[str, Any]] = queue.Queue()
@@ -138,7 +138,7 @@ class SorterWindow:
         outer = ttk.Frame(self.root, padding=18)
         outer.pack(fill="both", expand=True)
 
-        ttk.Label(outer, text="DICOM Sorter", font=("TkDefaultFont", 20, "bold")).pack(anchor="w")
+        ttk.Label(outer, text=f"DICOM Sorter · v{__version__}", font=("TkDefaultFont", 20, "bold")).pack(anchor="w")
         ttk.Label(
             outer,
             text="1. Choose the scanner folder.  2. Preview the sequences.  3. Copy them into sorted folders. Your original files stay untouched.",
@@ -515,13 +515,7 @@ class SorterWindow:
         def convert() -> str:
             config = json.loads(Path(config_text).expanduser().read_text(encoding="utf-8"))
             output.parent.mkdir(parents=True, exist_ok=True)
-            env = os.environ.copy()
-            tool_dirs = []
-            for tool in (executable, dcm2niix):
-                parent = str(Path(tool).parent)
-                if parent not in tool_dirs:
-                    tool_dirs.append(parent)
-            env["PATH"] = os.pathsep.join([*tool_dirs, env.get("PATH", "")])
+            env = _converter_environment(Path(executable), Path(dcm2niix))
             for index, (label, participant) in enumerate(participants, 1):
                 self.events.put(("progress", f"Converting {label} to BIDS ({index} of {len(participants)})…"))
                 subject_source = sorted_root / label
@@ -539,14 +533,13 @@ class SorterWindow:
                                "-c", str(Path(config_text).expanduser()), "-o", str(output)]
                     if session:
                         command.extend(["-s", session])
-                    if getattr(sys, "frozen", False) and sys.platform == "win32" and _bundled_converter("dcm2bids") == Path(executable):
-                        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
                     result = subprocess.run(command, capture_output=True, text=True, env=env)
                     if result.returncode:
                         details = (result.stderr or result.stdout or "No converter details were returned").strip()
                         raise RuntimeError(
                             f"dcm2bids failed for {label} ({index - 1} of {len(participants)} subjects completed; "
-                            f"exit {result.returncode}). Partial output may exist at {output}.\n{details[-3000:]}"
+                            f"exit {result.returncode}). App v{__version__}; converter: {executable}. "
+                            f"Partial output may exist at {output}.\n{details[-3000:]}"
                         )
                 self.events.put(("progress", f"Finalizing {label} ({index} of {len(participants)})…"))
                 finalize_bids(output, participant, session, config)
@@ -618,35 +611,143 @@ class SorterWindow:
         self.root.after(100, self._poll_events)
 
 
-def self_test() -> None:
+def _write_converter_smoke_dicom(path: Path, *, study_uid: str, series_uid: str, instance: int) -> None:
+    from pydicom import FileDataset, FileMetaDataset
+    from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
+
+    sop_uid = generate_uid()
+    meta = FileMetaDataset()
+    meta.MediaStorageSOPClassUID = MRImageStorage
+    meta.MediaStorageSOPInstanceUID = sop_uid
+    meta.TransferSyntaxUID = ExplicitVRLittleEndian
+    meta.ImplementationClassUID = generate_uid()
+    ds = FileDataset(str(path), {}, file_meta=meta, preamble=b"\0" * 128)
+    ds.SOPClassUID = MRImageStorage
+    ds.SOPInstanceUID = sop_uid
+    ds.PatientName = "NeuroFlow^Synthetic"
+    ds.PatientID = "NFSMOKE"
+    ds.StudyInstanceUID = study_uid
+    ds.SeriesInstanceUID = series_uid
+    ds.StudyDate = "20260101"
+    ds.StudyTime = "101500.25"
+    ds.SeriesNumber = 1
+    ds.SeriesDescription = "NeuroFlow Synthetic T1"
+    ds.ProtocolName = "NeuroFlow Synthetic T1"
+    ds.AcquisitionTime = "101500.25"
+    ds.InstanceNumber = instance
+    ds.Modality = "MR"
+    ds.Manufacturer = "Siemens"
+    ds.MagneticFieldStrength = 3.0
+    ds.MRAcquisitionType = "2D"
+    ds.PatientPosition = "HFS"
+    ds.RepetitionTime = 10.0
+    ds.Rows = 4
+    ds.Columns = 4
+    ds.PixelSpacing = [1.0, 1.0]
+    ds.SliceThickness = 1.0
+    ds.SpacingBetweenSlices = 1.0
+    ds.ImagePositionPatient = [0.0, 0.0, float(instance - 1)]
+    ds.ImageOrientationPatient = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    ds.SamplesPerPixel = 1
+    ds.PhotometricInterpretation = "MONOCHROME2"
+    ds.BitsAllocated = 16
+    ds.BitsStored = 16
+    ds.HighBit = 15
+    ds.PixelRepresentation = 0
+    ds.PixelData = bytes([instance] * (ds.Rows * ds.Columns * 2))
+    ds.save_as(path, enforce_file_format=True)
+
+
+def _converter_environment(*executables: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    tool_dirs = []
+    for executable in executables:
+        directory = str(executable.parent)
+        if directory not in tool_dirs:
+            tool_dirs.append(directory)
+    env["PATH"] = os.pathsep.join([*tool_dirs, env.get("PATH", "")])
+    if sys.platform == "win32" and any(
+        bundled is not None and executable.resolve() == bundled.resolve()
+        for tool in ("dcm2bids", "dcm2niix")
+        for bundled in [_bundled_converter(tool)]
+        for executable in executables
+    ):
+        # dcm2bids is itself a PyInstaller executable. Start it with a clean
+        # bootloader environment, including when its install path contains spaces.
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        env.pop("_MEIPASS2", None)
+    return env
+
+
+def self_test(*, conversion: bool = False) -> None:
     rules = load_rules(_bundled_preset())
     config_path = _bundled_preset().with_name(BIDS_CONFIG_NAME)
     with config_path.open(encoding="utf-8") as stream:
         config = json.load(stream)
     if not isinstance(config, dict):
         raise ValueError(f"Bundled BIDS config is not a JSON object: {config_path}")
-    if getattr(sys, "_MEIPASS", None):
+    frozen = bool(getattr(sys, "_MEIPASS", None))
+    if frozen:
         bundled_tools = ("dcm2bids", "dcm2bids_helper", "dcm2bids_scaffold", "dcm2niix")
         missing = [name for name in bundled_tools if _bundled_converter(name) is None]
         if missing:
             raise RuntimeError("Standalone package is missing converter tool(s): " + ", ".join(missing))
-        env = os.environ.copy()
-        env["PATH"] = str(Path(sys._MEIPASS) / "tools") + os.pathsep + env.get("PATH", "")
-        if sys.platform == "win32":
-            env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-        subprocess.run([str(_bundled_converter("dcm2bids")), "--version"], capture_output=True, text=True, env=env, check=True)
-        subprocess.run([str(_bundled_converter("dcm2niix")), "-h"], capture_output=True, text=True, env=env, check=True)
+    dcm2bids = _bundled_converter("dcm2bids") or shutil.which("dcm2bids")
+    dcm2niix = _bundled_converter("dcm2niix") or shutil.which("dcm2niix")
+    if conversion and (not dcm2bids or not dcm2niix):
+        raise RuntimeError("Conversion smoke test needs dcm2bids and dcm2niix bundled or available on PATH")
+    if dcm2bids and dcm2niix:
+        dcm2bids_path, dcm2niix_path = Path(dcm2bids), Path(dcm2niix)
+        env = _converter_environment(dcm2bids_path, dcm2niix_path)
+        subprocess.run([str(dcm2bids_path), "--version"], capture_output=True, text=True, env=env, check=True)
+        subprocess.run([str(dcm2niix_path), "-h"], capture_output=True, text=True, env=env, check=True)
+        if conversion:
+            from pydicom.uid import generate_uid
+
+            with tempfile.TemporaryDirectory(prefix="neuroflow-sorter-smoke-") as temporary:
+                root = Path(temporary)
+                source = root / "dicom"
+                source.mkdir()
+                study_uid, series_uid = generate_uid(), generate_uid()
+                for instance in (1, 2):
+                    _write_converter_smoke_dicom(
+                        source / f"image-{instance}.dcm", study_uid=study_uid,
+                        series_uid=series_uid, instance=instance,
+                    )
+                smoke_config = root / "config.json"
+                smoke_config.write_text(json.dumps({
+                    "search_method": "fnmatch",
+                    "descriptions": [{
+                        "datatype": "anat", "suffix": "T1w",
+                        "criteria": {"SeriesDescription": "NeuroFlow Synthetic T1"},
+                    }],
+                }), encoding="utf-8")
+                output = root / "bids output with spaces"
+                command = [str(dcm2bids_path), "-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
+                result = subprocess.run(command, capture_output=True, text=True, env=env)
+                if result.returncode:
+                    details = (result.stderr or result.stdout or "No converter details were returned").strip()
+                    raise RuntimeError(
+                        f"Bundled dcm2bids conversion smoke test failed (exit {result.returncode}); "
+                        f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
+                    )
+                nifti = output / "sub-NFSMOKE" / "anat" / "sub-NFSMOKE_T1w.nii.gz"
+                if not nifti.is_file():
+                    found = [str(path.relative_to(output)) for path in output.rglob("*.nii*")]
+                    raise RuntimeError(f"dcm2bids smoke test made no expected T1w NIfTI; found: {found}")
+            print("Bundled dcm2bids + dcm2niix end-to-end conversion smoke test passed")
     print(f"{APP_NAME} {__version__}: resources and DICOM sorter imports are ready ({len(rules['rules'])} rules)")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="neuroflow-dicom-sorter")
     actions = parser.add_mutually_exclusive_group()
-    actions.add_argument("--self-test", action="store_true", help="verify bundled rules, BIDS config, and DICOM imports")
+    actions.add_argument("--self-test", action="store_true", help="verify bundled rules, BIDS config, and converter executables")
+    actions.add_argument("--self-test-conversion", action="store_true", help="run an end-to-end conversion on synthetic DICOM files")
     actions.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = parser.parse_args(argv)
-    if args.self_test:
-        self_test()
+    if args.self_test or args.self_test_conversion:
+        self_test(conversion=args.self_test_conversion)
         return 0
 
     root = tk.Tk()

@@ -1,10 +1,11 @@
 #define AppName "NeuroFlow DICOM Sorter"
-#define AppVersion "0.4.18"
+#define AppVersion "0.4.22"
 
 [Setup]
 AppId={{EBD8AD75-1289-4F50-A5E9-2E1D7F41E224}
 AppName={#AppName}
 AppVersion={#AppVersion}
+AppVerName={#AppName} {#AppVersion}
 AppPublisher=NeuroFlow
 DefaultDirName={localappdata}\Programs\NeuroFlow DICOM Sorter
 DefaultGroupName=NeuroFlow DICOM Sorter

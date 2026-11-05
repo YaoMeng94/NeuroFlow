@@ -10,7 +10,7 @@ from unittest.mock import patch
 from pydicom import FileDataset, FileMetaDataset
 from pydicom.uid import ExplicitVRLittleEndian, MRImageStorage, generate_uid
 
-from neuroflow.dicom_sort import inspect_dicom, sort_dicom
+from neuroflow.dicom_sort import inspect_dicom, load_rules, sort_dicom
 
 
 def write_dicom(path: Path, *, series_number: int, description: str, protocol: str) -> None:
@@ -59,6 +59,27 @@ class DicomSortTests(unittest.TestCase):
         self.assertEqual([row["status"] for row in preview], ["ambiguous", "matched", "unmatched"])
         self.assertEqual(preview[0]["category"], "_review_multiple_matches")
         self.assertEqual(preview[2]["category"], "_unmatched")
+
+    def test_general_rules_classify_bold_and_dwi_physiolog_as_physio(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        rules = load_rules(root / "data" / "dicom_sort_rules_general.json")
+        source = self.root / "scanner-physio"
+        source.mkdir()
+        write_dicom(
+            source / "bold-physio.dcm", series_number=21,
+            description="mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm_PhysioLog",
+            protocol="mbep2d_bold_REST2_MB6_echo5_10_87_2.5mm",
+        )
+        write_dicom(
+            source / "dwi-physio.dcm", series_number=33,
+            description="mbep2d_diff_dir99b0_1.5mm_PA_PhysioLog",
+            protocol="mbep2d_diff_dir99b0_1.5mm_PA",
+        )
+
+        preview = inspect_dicom(source, rules)
+
+        self.assertEqual([row["category"] for row in preview], ["physio", "physio"])
+        self.assertEqual([row["status"] for row in preview], ["matched", "matched"])
 
     def test_copy_preserves_source_and_places_series_in_reviewable_folders(self) -> None:
         before = {

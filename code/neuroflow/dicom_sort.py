@@ -59,6 +59,7 @@ def load_rules(path: Path) -> dict[str, Any]:
             raise ValueError(f"Rule {index} needs a non-empty category")
         match = rule.get("match")
         match_any = rule.get("match_any")
+        exclude = rule.get("exclude")
         clauses = []
         if match is not None:
             if not isinstance(match, dict) or not match:
@@ -70,7 +71,9 @@ def load_rules(path: Path) -> dict[str, Any]:
             clauses.extend(match_any)
         if not clauses:
             raise ValueError(f"Rule {index} needs match or match_any")
-        for clause in clauses:
+        if exclude is not None and (not isinstance(exclude, dict) or not exclude):
+            raise ValueError(f"Rule {index} exclude must be a non-empty object")
+        for clause in [*clauses, *([exclude] if exclude is not None else [])]:
             unknown = set(clause) - set(_TAGS)
             if unknown:
                 raise ValueError(f"Rule {index} uses unsupported DICOM fields: {', '.join(sorted(unknown))}")
@@ -310,6 +313,11 @@ def inspect_dicom(
         values = files[0].values
         matches = []
         for rule in rules["rules"]:
+            if any(
+                re.search(pattern, values.get(field, ""), re.IGNORECASE)
+                for field, pattern in rule.get("exclude", {}).items()
+            ):
+                continue
             clauses = []
             if rule.get("match"):
                 clauses.append(rule["match"])
