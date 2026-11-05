@@ -529,11 +529,16 @@ class SorterWindow:
                             shutil.copyfile(path, staged / f"{count:08d}{path.suffix or '.dcm'}")
                     if not count:
                         raise ValueError(f"The sorted folder for {label} contains no files")
-                    command = [executable, "-d", str(staged), "-p", participant,
-                               "-c", str(Path(config_text).expanduser()), "-o", str(output)]
+                    arguments = ["-d", str(staged), "-p", participant,
+                                 "-c", str(Path(config_text).expanduser()), "-o", str(output)]
                     if session:
-                        command.extend(["-s", session])
-                    result = subprocess.run(command, capture_output=True, text=True, env=env)
+                        arguments.extend(["-s", session])
+                    _prepare_external_process()
+                    result = subprocess.run(
+                        _converter_command(Path(executable), arguments),
+                        capture_output=True, text=True, env=env,
+                        **_converter_launch_kwargs(Path(executable)),
+                    )
                     if result.returncode:
                         details = (result.stderr or result.stdout or "No converter details were returned").strip()
                         raise RuntimeError(
@@ -658,6 +663,31 @@ def _write_converter_smoke_dicom(path: Path, *, study_uid: str, series_uid: str,
     ds.save_as(path, enforce_file_format=True)
 
 
+def _converter_command(executable: Path, arguments: list[str]) -> list[str]:
+    """Build a child command that is safe when the Windows app path contains spaces."""
+    argv0 = executable.name if sys.platform == "win32" else str(executable)
+    return [argv0, *arguments]
+
+
+def _converter_launch_kwargs(executable: Path) -> dict[str, str]:
+    # Supplying lpApplicationName removes CreateProcess path inference when the
+    # installation directory contains spaces. Keep argv[0] short and explicit.
+    return {"executable": str(executable)} if sys.platform == "win32" else {}
+
+
+def _prepare_external_process() -> None:
+    if sys.platform == "win32":
+        # PyInstaller sets the parent app directory as the process DLL search
+        # directory. Windows propagates it to children unless it is reset.
+        import ctypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.SetDllDirectoryW.argtypes = [ctypes.c_wchar_p]
+        kernel32.SetDllDirectoryW.restype = ctypes.c_bool
+        if not kernel32.SetDllDirectoryW(None):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
 def _converter_environment(*executables: Path) -> dict[str, str]:
     env = os.environ.copy()
     tool_dirs = []
@@ -699,8 +729,12 @@ def self_test(*, conversion: bool = False) -> None:
     if dcm2bids and dcm2niix:
         dcm2bids_path, dcm2niix_path = Path(dcm2bids), Path(dcm2niix)
         env = _converter_environment(dcm2bids_path, dcm2niix_path)
-        subprocess.run([str(dcm2bids_path), "--version"], capture_output=True, text=True, env=env, check=True)
-        subprocess.run([str(dcm2niix_path), "-h"], capture_output=True, text=True, env=env, check=True)
+        for executable, arguments in ((dcm2bids_path, ["--version"]), (dcm2niix_path, ["-h"])):
+            _prepare_external_process()
+            subprocess.run(
+                _converter_command(executable, arguments), capture_output=True, text=True, env=env, check=True,
+                **_converter_launch_kwargs(executable),
+            )
         if conversion:
             from pydicom.uid import generate_uid
 
@@ -723,12 +757,15 @@ def self_test(*, conversion: bool = False) -> None:
                     }],
                 }), encoding="utf-8")
                 output = root / "bids output with spaces"
-                command = [str(dcm2bids_path), "-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
+                arguments = ["-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
+                command = _converter_command(dcm2bids_path, arguments)
                 converter_log = root / "dcm2bids-smoke.log"
                 with converter_log.open("w", encoding="utf-8", errors="replace") as log:
+                    _prepare_external_process()
                     process = subprocess.Popen(
                         command, stdout=log, stderr=subprocess.STDOUT, env=env,
                         creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+                        **_converter_launch_kwargs(dcm2bids_path),
                     )
                     try:
                         returncode = process.wait(timeout=120)
