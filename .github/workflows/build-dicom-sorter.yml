@@ -115,6 +115,22 @@ jobs:
           }
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" code/packaging/windows/NeuroFlowDICOMSorter.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup exited with $LASTEXITCODE" }
+      - name: Checksum Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
+      - uses: actions/upload-artifact@v7
+        if: runner.os == 'Windows'
+        with:
+          name: NeuroFlowDICOMSorter-Windows-${{ runner.arch }}-v${{ steps.app-version.outputs.version }}
+          path: |
+            NeuroFlowDICOMSorter-*.exe
+            NeuroFlowDICOMSorter-*.sha256
+          if-no-files-found: error
       - name: Install, test conversion, reinstall, and uninstall the Windows package
         if: runner.os == 'Windows'
         shell: pwsh
@@ -153,15 +169,8 @@ jobs:
           if ($remove.ExitCode -ne 0) { throw "Uninstaller exited with $($remove.ExitCode)" }
           if (Test-Path $app) { throw 'Sorter executable remains after uninstall' }
           if (-not (Test-Path $profileMarker)) { throw 'Sorter uninstall removed user profile data' }
-      - name: Checksum Windows installer
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem $env:GITHUB_WORKSPACE -Filter 'NeuroFlowDICOMSorter-Windows-Setup-*.exe' | Select-Object -First 1
-          if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
-          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  $($installer.Name)" | Set-Content -Encoding ascii "$($installer.FullName).sha256"
       - uses: actions/upload-artifact@v7
+        if: runner.os == 'macOS'
         with:
           name: NeuroFlowDICOMSorter-${{ runner.os }}-${{ runner.arch }}-v${{ steps.app-version.outputs.version }}
           path: |
