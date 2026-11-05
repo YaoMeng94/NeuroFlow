@@ -724,16 +724,38 @@ def self_test(*, conversion: bool = False) -> None:
                 }), encoding="utf-8")
                 output = root / "bids output with spaces"
                 command = [str(dcm2bids_path), "-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
-                try:
-                    result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=120)
-                except subprocess.TimeoutExpired as exc:
-                    stdout = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
-                    stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-                    details = (stderr or stdout or "The converter produced no output before the timeout.").strip()
-                    raise RuntimeError(
-                        f"Bundled dcm2bids conversion smoke test exceeded 120 seconds; "
-                        f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
-                    ) from exc
+                converter_log = root / "dcm2bids-smoke.log"
+                with converter_log.open("w", encoding="utf-8", errors="replace") as log:
+                    process = subprocess.Popen(
+                        command, stdout=log, stderr=subprocess.STDOUT, env=env,
+                        creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+                    )
+                    try:
+                        returncode = process.wait(timeout=120)
+                    except subprocess.TimeoutExpired as exc:
+                        if sys.platform == "win32":
+                            subprocess.run(
+                                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                timeout=20, check=False,
+                            )
+                        else:
+                            process.kill()
+                        try:
+                            process.wait(timeout=20)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
+                        details = converter_log.read_text(encoding="utf-8", errors="replace").strip()
+                        if not details:
+                            details = "The converter produced no output before the timeout."
+                        raise RuntimeError(
+                            f"Bundled dcm2bids conversion smoke test exceeded 120 seconds; "
+                            f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
+                        ) from exc
+                result = subprocess.CompletedProcess(
+                    command, returncode, converter_log.read_text(encoding="utf-8", errors="replace"), ""
+                )
                 if result.returncode:
                     details = (result.stderr or result.stdout or "No converter details were returned").strip()
                     raise RuntimeError(
