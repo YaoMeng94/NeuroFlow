@@ -724,7 +724,16 @@ def self_test(*, conversion: bool = False) -> None:
                 }), encoding="utf-8")
                 output = root / "bids output with spaces"
                 command = [str(dcm2bids_path), "-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
-                result = subprocess.run(command, capture_output=True, text=True, env=env)
+                try:
+                    result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=120)
+                except subprocess.TimeoutExpired as exc:
+                    stdout = exc.stdout.decode(errors="replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+                    stderr = exc.stderr.decode(errors="replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+                    details = (stderr or stdout or "The converter produced no output before the timeout.").strip()
+                    raise RuntimeError(
+                        f"Bundled dcm2bids conversion smoke test exceeded 120 seconds; "
+                        f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
+                    ) from exc
                 if result.returncode:
                     details = (result.stderr or result.stdout or "No converter details were returned").strip()
                     raise RuntimeError(
