@@ -118,7 +118,7 @@ jobs:
           if (-not $installer) { throw 'Versioned Windows sorter installer was not created' }
           $installer = $installer.FullName
           $installDir = Join-Path $env:RUNNER_TEMP 'NeuroFlow DICOM Sorter Test'
-          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installDir`"") -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "Windows sorter installer exited with $($install.ExitCode)" }
           $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
           if (-not (Test-Path $app)) { throw 'Installed sorter executable is missing' }
@@ -138,7 +138,7 @@ jobs:
           New-Item -ItemType Directory -Path $profile -Force | Out-Null
           $profileMarker = Join-Path $profile 'deployment-test-marker'
           Set-Content -Path $profileMarker -Value 'preserve' -Encoding ascii
-          $reinstall = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=$installDir") -Wait -PassThru
+          $reinstall = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installDir`"") -Wait -PassThru
           if ($reinstall.ExitCode -ne 0) { throw "Sorter reinstall exited with $($reinstall.ExitCode)" }
           if (-not (Test-Path $app)) { throw 'Sorter executable is missing after reinstall' }
           if (-not (Test-Path $profileMarker)) { throw 'Sorter reinstall removed user profile data' }
