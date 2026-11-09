@@ -14,9 +14,11 @@ from test_dicom_sort import write_dicom
 
 class StandaloneGuiIntegrationTests(unittest.TestCase):
     def test_windows_converter_command_avoids_install_path_with_spaces(self) -> None:
+        from pathlib import PureWindowsPath
+
         from neuroflow.standalone_gui import _converter_command, _converter_launch_kwargs
 
-        executable = Path(r"D:\NeuroFlow DICOM Sorter\_internal\tools\dcm2bids.exe")
+        executable = PureWindowsPath(r"D:\NeuroFlow DICOM Sorter\_internal\tools\dcm2bids.exe")
         arguments = ["-d", r"C:\temp\dicom", "-p", "TEST", "-c", r"C:\config.json", "-o", r"C:\out"]
         with patch("neuroflow.standalone_gui.sys.platform", "win32"):
             command = _converter_command(executable, arguments)
