@@ -19,15 +19,17 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
         from neuroflow.standalone_gui import _converter_command, _converter_launch_kwargs
 
         executable = PureWindowsPath(r"D:\NeuroFlow DICOM Sorter\_internal\tools\dcm2bids.exe")
+        short_executable = PureWindowsPath(r"D:\NEUROF~1\_internal\tools\dcm2bids.exe")
         arguments = ["-d", r"C:\temp\dicom", "-p", "TEST", "-c", r"C:\config.json", "-o", r"C:\out"]
-        with patch("neuroflow.standalone_gui.sys.platform", "win32"):
+        with patch("neuroflow.standalone_gui.sys.platform", "win32"), \
+             patch("neuroflow.standalone_gui._windows_short_path", return_value=short_executable):
             command = _converter_command(executable, arguments)
             launch_kwargs = _converter_launch_kwargs(executable)
 
-        self.assertEqual(command[0], executable.name)
+        self.assertEqual(command[0], str(short_executable))
         self.assertEqual(command[1:], arguments)
         self.assertNotIn(r"D:\NeuroFlow DICOM Sorter", " ".join(command))
-        self.assertEqual(launch_kwargs, {"cwd": str(executable.parent)})
+        self.assertEqual(launch_kwargs, {"executable": str(short_executable)})
 
     def test_convert_all_subjects_stages_one_participant_at_a_time(self) -> None:
         import tkinter as tk
