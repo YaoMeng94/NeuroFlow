@@ -756,7 +756,11 @@ def self_test(*, conversion: bool = False) -> None:
         config = json.load(stream)
     if not isinstance(config, dict):
         raise ValueError(f"Bundled BIDS config is not a JSON object: {config_path}")
-    if not _has_dcm2bids():
+    # The Linux/HPC controller package imports this module for its installer
+    # smoke test, but intentionally does not install standalone conversion
+    # dependencies. The desktop bundles must always include the engine; any
+    # explicit conversion smoke test must verify it on every platform.
+    if (conversion or sys.platform in {"win32", "darwin"}) and not _has_dcm2bids():
         raise RuntimeError("Standalone package is missing the dcm2bids Python engine")
     dcm2niix = _bundled_converter("dcm2niix") or shutil.which("dcm2niix")
     if conversion and not dcm2niix:
