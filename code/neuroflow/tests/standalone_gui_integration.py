@@ -24,7 +24,7 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
 
         self.assertEqual(command[0], executable.name)
         self.assertEqual(command[1:], arguments)
-        self.assertNotIn(str(executable.parent.parent), " ".join(command))
+        self.assertNotIn(r"D:\NeuroFlow DICOM Sorter", " ".join(command))
         self.assertEqual(launch_kwargs, {"cwd": str(executable.parent)})
 
     def test_convert_all_subjects_stages_one_participant_at_a_time(self) -> None:
