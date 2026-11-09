@@ -665,14 +665,16 @@ def _write_converter_smoke_dicom(path: Path, *, study_uid: str, series_uid: str,
 
 
 def _converter_command(executable: Path, arguments: list[str]) -> list[str]:
-    """Build a child command whose argv[0] remains its full, space-safe path on Windows."""
-    return [str(executable), *arguments]
+    """Avoid embedding the spaced installation path in Windows child argv."""
+    argv0 = executable.name if sys.platform == "win32" else str(executable)
+    return [argv0, *arguments]
 
 
 def _converter_launch_kwargs(executable: Path) -> dict[str, str]:
-    # Keep the explicit application name and the full executable path in argv[0].
-    # Frozen Windows children use both values when rebuilding their own argv.
-    return {"executable": str(executable)} if sys.platform == "win32" else {}
+    # Resolve the bare executable name from its tools directory. Neither the
+    # Windows command line nor CreateProcess's application-name field contains
+    # the install path, which may include spaces.
+    return {"cwd": str(executable.parent)} if sys.platform == "win32" else {}
 
 
 def _prepare_external_process() -> None:
