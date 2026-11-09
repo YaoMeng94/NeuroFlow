@@ -54,10 +54,7 @@ def finalize_macos_bundle(version: str) -> None:
 
 def main() -> int:
     suffix = ".exe" if sys.platform == "win32" else ""
-    bundled_tools = [
-        CONVERTER_TOOLS / f"{name}{suffix}"
-        for name in ("dcm2bids", "dcm2bids_helper", "dcm2bids_scaffold", "dcm2niix")
-    ]
+    bundled_tools = [CONVERTER_TOOLS / f"dcm2niix{suffix}"]
     bundled_tools.append(CONVERTER_TOOLS / "THIRD-PARTY-LICENSES.txt")
     if not all(path.is_file() for path in bundled_tools):
         subprocess.run([sys.executable, str(ROOT / "code" / "packaging" / "prepare_converter_tools.py")], cwd=ROOT, check=True)
@@ -69,6 +66,7 @@ def main() -> int:
         "--paths", str(ROOT / "code"),
         "--specpath", str(ROOT / "build" / "standalone_sorter"),
         "--collect-all", "pydicom",
+        "--collect-all", "dcm2bids",
         "--exclude-module", "numpy",
         "--exclude-module", "scipy",
         "--exclude-module", "matplotlib",

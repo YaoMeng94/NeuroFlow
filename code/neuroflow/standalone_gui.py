@@ -9,6 +9,10 @@ from __future__ import annotations
 import argparse
 import os
 import json
+import contextlib
+import io
+import logging
+import traceback
 import queue
 import shutil
 import subprocess
@@ -474,12 +478,11 @@ class SorterWindow:
         if not config_text or not Path(config_text).expanduser().is_file():
             messagebox.showerror(APP_NAME, "Choose a dcm2bids JSON config that maps your sequences to BIDS.", parent=self.root)
             return
-        executable = _bundled_converter("dcm2bids") or shutil.which("dcm2bids")
         dcm2niix = _bundled_converter("dcm2niix") or shutil.which("dcm2niix")
-        if executable is None:
+        if not _has_dcm2bids():
             messagebox.showerror(
                 APP_NAME,
-                "dcm2bids was not found in the app or on PATH. Reinstall the app, or install dcm2bids and dcm2niix, then relaunch it.",
+                "The bundled dcm2bids engine is missing. Reinstall the app before converting to BIDS.",
                 parent=self.root,
             )
             return
@@ -515,7 +518,7 @@ class SorterWindow:
         def convert() -> str:
             config = json.loads(Path(config_text).expanduser().read_text(encoding="utf-8"))
             output.parent.mkdir(parents=True, exist_ok=True)
-            env = _converter_environment(Path(executable), Path(dcm2niix))
+            env = _converter_environment(Path(dcm2niix))
             for index, (label, participant) in enumerate(participants, 1):
                 self.events.put(("progress", f"Converting {label} to BIDS ({index} of {len(participants)})…"))
                 subject_source = sorted_root / label
@@ -534,18 +537,13 @@ class SorterWindow:
                     if session:
                         arguments.extend(["-s", session])
                     _prepare_external_process()
-                    result = subprocess.run(
-                        _converter_command(Path(executable), arguments),
-                        capture_output=True, text=True, env=env,
-                        **_converter_launch_kwargs(Path(executable)),
-                    )
+                    result = _invoke_dcm2bids(arguments, env)
                     if result.returncode:
                         details = (result.stderr or result.stdout or "No converter details were returned").strip()
                         raise RuntimeError(
                             f"dcm2bids failed for {label} ({index - 1} of {len(participants)} subjects completed; "
-                            f"exit {result.returncode}). App v{__version__}; converter: {executable}. "
-                            f"Command: {_converter_command(Path(executable), arguments)!r}. "
-                            f"Partial output may exist at {output}.\n{details[-3000:]}"
+                            f"exit {result.returncode}). App v{__version__}; bundled dcm2bids 3.3.1. "
+                            f"Command: {result.args!r}. Partial output may exist at {output}.\n{details[-3000:]}"
                         )
                 self.events.put(("progress", f"Finalizing {label} ({index} of {len(participants)})…"))
                 finalize_bids(output, participant, session, config)
@@ -689,6 +687,57 @@ def _prepare_external_process() -> None:
             raise ctypes.WinError(ctypes.get_last_error())
 
 
+def _has_dcm2bids() -> bool:
+    try:
+        import dcm2bids.cli.dcm2bids  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _invoke_dcm2bids(
+    arguments: list[str],
+    env: dict[str, str],
+    *,
+    entrypoint: Any = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run dcm2bids in-process so Windows paths and schema data stay internal."""
+    if entrypoint is None:
+        from dcm2bids.cli.dcm2bids import main as entrypoint
+
+    command = ["dcm2bids", *arguments]
+    captured = io.StringIO()
+    previous_argv = sys.argv
+    previous_path = os.environ.get("PATH")
+    root_logger = logging.getLogger()
+    previous_handlers = root_logger.handlers[:]
+    previous_level = root_logger.level
+    try:
+        root_logger.handlers = []
+        root_logger.setLevel(logging.WARNING)
+        os.environ["PATH"] = env.get("PATH", os.environ.get("PATH", ""))
+        sys.argv = command[:]
+        with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+            entrypoint()
+        return subprocess.CompletedProcess(command, 0, captured.getvalue(), "")
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+        return subprocess.CompletedProcess(command, code, captured.getvalue(), "")
+    except Exception:
+        return subprocess.CompletedProcess(command, 1, captured.getvalue(), traceback.format_exc())
+    finally:
+        for handler in root_logger.handlers:
+            if handler not in previous_handlers:
+                handler.close()
+        root_logger.handlers = previous_handlers
+        root_logger.setLevel(previous_level)
+        sys.argv = previous_argv
+        if previous_path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = previous_path
+
+
 def _converter_environment(*executables: Path) -> dict[str, str]:
     env = os.environ.copy()
     tool_dirs = []
@@ -697,16 +746,6 @@ def _converter_environment(*executables: Path) -> dict[str, str]:
         if directory not in tool_dirs:
             tool_dirs.append(directory)
     env["PATH"] = os.pathsep.join([*tool_dirs, env.get("PATH", "")])
-    if sys.platform == "win32" and any(
-        bundled is not None and executable.resolve() == bundled.resolve()
-        for tool in ("dcm2bids", "dcm2niix")
-        for bundled in [_bundled_converter(tool)]
-        for executable in executables
-    ):
-        # dcm2bids is itself a PyInstaller executable. Start it with a clean
-        # bootloader environment, including when its install path contains spaces.
-        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
-        env.pop("_MEIPASS2", None)
     return env
 
 
@@ -717,34 +756,25 @@ def self_test(*, conversion: bool = False) -> None:
         config = json.load(stream)
     if not isinstance(config, dict):
         raise ValueError(f"Bundled BIDS config is not a JSON object: {config_path}")
-    frozen = bool(getattr(sys, "_MEIPASS", None))
-    if frozen:
-        bundled_tools = ("dcm2bids", "dcm2bids_helper", "dcm2bids_scaffold", "dcm2niix")
-        missing = [name for name in bundled_tools if _bundled_converter(name) is None]
-        if missing:
-            raise RuntimeError("Standalone package is missing converter tool(s): " + ", ".join(missing))
-    dcm2bids = _bundled_converter("dcm2bids") or shutil.which("dcm2bids")
+    if not _has_dcm2bids():
+        raise RuntimeError("Standalone package is missing the dcm2bids Python engine")
     dcm2niix = _bundled_converter("dcm2niix") or shutil.which("dcm2niix")
-    if conversion and (not dcm2bids or not dcm2niix):
-        raise RuntimeError("Conversion smoke test needs dcm2bids and dcm2niix bundled or available on PATH")
-    if dcm2bids and dcm2niix:
-        dcm2bids_path, dcm2niix_path = Path(dcm2bids), Path(dcm2niix)
-        env = _converter_environment(dcm2bids_path, dcm2niix_path)
-        for executable, arguments, expected in (
-            (dcm2bids_path, ["--version"], "dcm2bids"),
-            (dcm2niix_path, ["-h"], "dcm2niix"),
-        ):
-            _prepare_external_process()
-            result = subprocess.run(
-                _converter_command(executable, arguments), capture_output=True, text=True, env=env,
-                check=True, timeout=30, **_converter_launch_kwargs(executable),
+    if conversion and not dcm2niix:
+        raise RuntimeError("Conversion smoke test needs dcm2niix bundled or available on PATH")
+    if dcm2niix:
+        dcm2niix_path = Path(dcm2niix)
+        env = _converter_environment(dcm2niix_path)
+        _prepare_external_process()
+        result = subprocess.run(
+            _converter_command(dcm2niix_path, ["-h"]), capture_output=True, text=True,
+            env=env, check=True, timeout=30, **_converter_launch_kwargs(dcm2niix_path),
+        )
+        identity = (result.stdout + "\n" + result.stderr).lower()
+        if "dcm2niix" not in identity:
+            raise RuntimeError(
+                f"Unexpected executable launched for dcm2niix: {dcm2niix_path}; "
+                f"reported output: {identity.strip()[:1000]}"
             )
-            identity = (result.stdout + "\n" + result.stderr).lower()
-            if expected not in identity:
-                raise RuntimeError(
-                    f"Unexpected executable launched for {expected}: {executable}; "
-                    f"reported output: {identity.strip()[:1000]}"
-                )
         if conversion:
             from pydicom.uid import generate_uid
 
@@ -768,46 +798,12 @@ def self_test(*, conversion: bool = False) -> None:
                 }), encoding="utf-8")
                 output = root / "bids output with spaces"
                 arguments = ["-d", str(source), "-p", "NFSMOKE", "-c", str(smoke_config), "-o", str(output)]
-                command = _converter_command(dcm2bids_path, arguments)
-                converter_log = root / "dcm2bids-smoke.log"
-                with converter_log.open("w", encoding="utf-8", errors="replace") as log:
-                    _prepare_external_process()
-                    process = subprocess.Popen(
-                        command, stdout=log, stderr=subprocess.STDOUT, env=env,
-                        creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
-                        **_converter_launch_kwargs(dcm2bids_path),
-                    )
-                    try:
-                        returncode = process.wait(timeout=120)
-                    except subprocess.TimeoutExpired as exc:
-                        if sys.platform == "win32":
-                            subprocess.run(
-                                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                timeout=20, check=False,
-                            )
-                        else:
-                            process.kill()
-                        try:
-                            process.wait(timeout=20)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-                            process.wait(timeout=5)
-                        details = converter_log.read_text(encoding="utf-8", errors="replace").strip()
-                        if not details:
-                            details = "The converter produced no output before the timeout."
-                        raise RuntimeError(
-                            f"Bundled dcm2bids conversion smoke test exceeded 120 seconds; "
-                            f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
-                        ) from exc
-                result = subprocess.CompletedProcess(
-                    command, returncode, converter_log.read_text(encoding="utf-8", errors="replace"), ""
-                )
+                result = _invoke_dcm2bids(arguments, env)
                 if result.returncode:
                     details = (result.stderr or result.stdout or "No converter details were returned").strip()
                     raise RuntimeError(
                         f"Bundled dcm2bids conversion smoke test failed (exit {result.returncode}); "
-                        f"app v{__version__}; executable: {dcm2bids_path}\n{details[-5000:]}"
+                        f"app v{__version__}; bundled dcm2niix: {dcm2niix_path}\n{details[-5000:]}"
                     )
                 nifti = output / "sub-NFSMOKE" / "anat" / "sub-NFSMOKE_T1w.nii.gz"
                 if not nifti.is_file():

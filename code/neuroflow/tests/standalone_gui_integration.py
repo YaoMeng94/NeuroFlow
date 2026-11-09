@@ -13,21 +13,26 @@ from test_dicom_sort import write_dicom
 
 
 class StandaloneGuiIntegrationTests(unittest.TestCase):
-    def test_windows_converter_command_avoids_install_path_with_spaces(self) -> None:
-        from pathlib import PureWindowsPath
+    def test_inprocess_dcm2bids_receives_arguments_without_executable_path(self) -> None:
+        import sys
 
-        from neuroflow.standalone_gui import _converter_command, _converter_launch_kwargs
+        from neuroflow.standalone_gui import _invoke_dcm2bids
 
-        executable = PureWindowsPath(r"D:\NeuroFlow DICOM Sorter\_internal\tools\dcm2bids.exe")
-        arguments = ["-d", r"C:\temp\dicom", "-p", "TEST", "-c", r"C:\config.json", "-o", r"C:\out"]
-        with patch("neuroflow.standalone_gui.sys.platform", "win32"):
-            command = _converter_command(executable, arguments)
-            launch_kwargs = _converter_launch_kwargs(executable)
+        previous_argv = sys.argv[:]
+        observed = {}
 
-        self.assertEqual(command[0], executable.name)
-        self.assertEqual(command[1:], arguments)
-        self.assertNotIn(r"D:\NeuroFlow DICOM Sorter", " ".join(command))
-        self.assertEqual(launch_kwargs, {"executable": str(executable)})
+        def fake_entrypoint():
+            observed["argv"] = sys.argv[:]
+
+        result = _invoke_dcm2bids(
+            ["-d", r"C:\Users\Test User\dicom", "-p", "TEST"],
+            {"PATH": os.environ.get("PATH", "")},
+            entrypoint=fake_entrypoint,
+        )
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(observed["argv"], ["dcm2bids", "-d", r"C:\Users\Test User\dicom", "-p", "TEST"])
+        self.assertEqual(sys.argv, previous_argv)
 
     def test_convert_all_subjects_stages_one_participant_at_a_time(self) -> None:
         import tkinter as tk
@@ -71,7 +76,8 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
                 staged_paths = []
                 participants = []
 
-                def run_converter(command, **kwargs):
+                def run_converter(arguments, env):
+                    command = ["dcm2bids", *arguments]
                     participant = command[command.index("-p") + 1]
                     staged = Path(command[command.index("-d") + 1])
                     files = list(staged.rglob("*.dcm"))
@@ -80,8 +86,9 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
                     participants.append(participant)
                     return __import__("subprocess").CompletedProcess(command, 0, "", "")
 
-                with patch("neuroflow.standalone_gui.shutil.which", return_value="dcm2bids"), \
-                     patch("neuroflow.standalone_gui.subprocess.run", side_effect=run_converter), \
+                with patch("neuroflow.standalone_gui._has_dcm2bids", return_value=True), \
+                     patch("neuroflow.standalone_gui.shutil.which", return_value="dcm2niix"), \
+                     patch("neuroflow.standalone_gui._invoke_dcm2bids", side_effect=run_converter), \
                      patch("neuroflow.standalone_gui.finalize_bids") as finalize, \
                      patch("neuroflow.standalone_gui.messagebox.askyesno", return_value=True), \
                      patch("neuroflow.standalone_gui.messagebox.showinfo") as showinfo, \
@@ -177,13 +184,14 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
                 self.assertEqual(before, after)
 
                 window.bids_output_var.set(str(root_path / "bids"))
-                with patch("neuroflow.standalone_gui.shutil.which", return_value=None), \
+                with patch("neuroflow.standalone_gui._has_dcm2bids", return_value=False), \
+                     patch("neuroflow.standalone_gui.shutil.which", return_value=None), \
                      patch("neuroflow.standalone_gui.messagebox.showerror") as showerror:
                     window._convert_bids()
                 message = showerror.call_args.args[1]
-                self.assertIn("dcm2bids was not found in the app or on PATH", message)
+                self.assertIn("bundled dcm2bids engine is missing", message)
                 self.assertIn("Reinstall the app", message)
-                self.assertIn("install dcm2bids and dcm2niix", message)
+                self.assertIn("Reinstall the app", message)
             finally:
                 root.destroy()
 

@@ -18,7 +18,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DESTINATION = ROOT / "build" / "converter-tools"
 RELEASES = {
-    "dcm2bids": ("UNFmontreal/Dcm2Bids", "3.3.1"),
     "dcm2niix": ("rordenlab/dcm2niix", "v1.0.20260724"),
 }
 

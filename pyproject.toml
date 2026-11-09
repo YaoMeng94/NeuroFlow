@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neuroflow"
-version = "0.4.27"
+version = "0.4.28"
 description = "Local web and CLI controller for multimodal BIDS processing"
 requires-python = ">=3.10"
 dependencies = [
@@ -30,7 +30,7 @@ test = [
   "Pillow>=10,<14",
   "reportlab>=4,<6",
 ]
-standalone = ["pyinstaller>=6.10,<8"]
+standalone = ["pyinstaller>=6.10,<8", "dcm2bids==3.3.1"]
 film-sheet = [
   "numpy>=1.23,<3",
   "nibabel>=5,<6",
