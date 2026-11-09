@@ -145,9 +145,19 @@ jobs:
           $app = Join-Path $installDir 'NeuroFlowDICOMSorter.exe'
           if (-not (Test-Path $app)) { throw 'Installed sorter executable is missing' }
           $selfTestLog = Join-Path $env:RUNNER_TEMP 'sorter-conversion-self-test.log'
-          $selfTest = Start-Process -FilePath $app -ArgumentList '--self-test-conversion' -Wait -PassThru `
-            -RedirectStandardOutput $selfTestLog -RedirectStandardError (Join-Path $env:RUNNER_TEMP 'sorter-conversion-self-test.error.log')
-          Get-Content $selfTestLog
+          $selfTestErrorLog = Join-Path $env:RUNNER_TEMP 'sorter-conversion-self-test.error.log'
+          Write-Host "Running installed conversion smoke test from path with spaces: $app"
+          $selfTest = Start-Process -FilePath $app -ArgumentList '--self-test-conversion' -PassThru `
+            -RedirectStandardOutput $selfTestLog -RedirectStandardError $selfTestErrorLog
+          if (-not $selfTest.WaitForExit(240000)) {
+            taskkill /PID $selfTest.Id /T /F | Out-Null
+            [void]$selfTest.WaitForExit(20000)
+            Get-Content $selfTestLog -ErrorAction SilentlyContinue
+            Get-Content $selfTestErrorLog -ErrorAction SilentlyContinue
+            throw 'Installed sorter conversion smoke test exceeded 240 seconds; process tree was terminated.'
+          }
+          Get-Content $selfTestLog -ErrorAction SilentlyContinue
+          Get-Content $selfTestErrorLog -ErrorAction SilentlyContinue
           if ($selfTest.ExitCode -ne 0) { throw "Installed sorter conversion smoke test exited with $($selfTest.ExitCode)" }
           $gui = Start-Process -FilePath $app -PassThru
           try {

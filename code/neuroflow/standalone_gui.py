@@ -544,6 +544,7 @@ class SorterWindow:
                         raise RuntimeError(
                             f"dcm2bids failed for {label} ({index - 1} of {len(participants)} subjects completed; "
                             f"exit {result.returncode}). App v{__version__}; converter: {executable}. "
+                            f"Command: {_converter_command(Path(executable), arguments)!r}. "
                             f"Partial output may exist at {output}.\n{details[-3000:]}"
                         )
                 self.events.put(("progress", f"Finalizing {label} ({index} of {len(participants)})…"))
@@ -664,14 +665,13 @@ def _write_converter_smoke_dicom(path: Path, *, study_uid: str, series_uid: str,
 
 
 def _converter_command(executable: Path, arguments: list[str]) -> list[str]:
-    """Build a child command that is safe when the Windows app path contains spaces."""
-    argv0 = executable.name if sys.platform == "win32" else str(executable)
-    return [argv0, *arguments]
+    """Build a child command whose argv[0] remains its full, space-safe path on Windows."""
+    return [str(executable), *arguments]
 
 
 def _converter_launch_kwargs(executable: Path) -> dict[str, str]:
-    # Supplying lpApplicationName removes CreateProcess path inference when the
-    # installation directory contains spaces. Keep argv[0] short and explicit.
+    # Keep the explicit application name and the full executable path in argv[0].
+    # Frozen Windows children use both values when rebuilding their own argv.
     return {"executable": str(executable)} if sys.platform == "win32" else {}
 
 
@@ -729,12 +729,21 @@ def self_test(*, conversion: bool = False) -> None:
     if dcm2bids and dcm2niix:
         dcm2bids_path, dcm2niix_path = Path(dcm2bids), Path(dcm2niix)
         env = _converter_environment(dcm2bids_path, dcm2niix_path)
-        for executable, arguments in ((dcm2bids_path, ["--version"]), (dcm2niix_path, ["-h"])):
+        for executable, arguments, expected in (
+            (dcm2bids_path, ["--version"], "dcm2bids"),
+            (dcm2niix_path, ["-h"], "dcm2niix"),
+        ):
             _prepare_external_process()
-            subprocess.run(
-                _converter_command(executable, arguments), capture_output=True, text=True, env=env, check=True,
-                **_converter_launch_kwargs(executable),
+            result = subprocess.run(
+                _converter_command(executable, arguments), capture_output=True, text=True, env=env,
+                check=True, timeout=30, **_converter_launch_kwargs(executable),
             )
+            identity = (result.stdout + "\n" + result.stderr).lower()
+            if expected not in identity:
+                raise RuntimeError(
+                    f"Unexpected executable launched for {expected}: {executable}; "
+                    f"reported output: {identity.strip()[:1000]}"
+                )
         if conversion:
             from pydicom.uid import generate_uid
 

@@ -13,6 +13,19 @@ from test_dicom_sort import write_dicom
 
 
 class StandaloneGuiIntegrationTests(unittest.TestCase):
+    def test_windows_converter_command_keeps_full_executable_path_in_argv0(self) -> None:
+        from neuroflow.standalone_gui import _converter_command, _converter_launch_kwargs
+
+        executable = Path(r"D:\NeuroFlow DICOM Sorter\_internal\tools\dcm2bids.exe")
+        arguments = ["-d", r"C:\temp\dicom", "-p", "TEST", "-c", r"C:\config.json", "-o", r"C:\out"]
+        with patch("neuroflow.standalone_gui.sys.platform", "win32"):
+            command = _converter_command(executable, arguments)
+            launch_kwargs = _converter_launch_kwargs(executable)
+
+        self.assertEqual(command[0], str(executable))
+        self.assertEqual(command[1:], arguments)
+        self.assertEqual(launch_kwargs, {"executable": str(executable)})
+
     def test_convert_all_subjects_stages_one_participant_at_a_time(self) -> None:
         import tkinter as tk
 
