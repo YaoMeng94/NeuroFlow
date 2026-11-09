@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DESTINATION = ROOT / "build" / "converter-tools"
 RELEASES = {
-    "dcm2bids": ("UNFmontreal/Dcm2Bids", "3.2.0"),
+    "dcm2bids": ("UNFmontreal/Dcm2Bids", "3.3.1"),
     "dcm2niix": ("rordenlab/dcm2niix", "v1.0.20260724"),
 }
 
@@ -122,7 +122,7 @@ def main() -> int:
         print(f"Prepared {tool} from {repository} {tag}: {asset['name']}")
     licenses = []
     for repository, tag, filename, label in (
-        ("UNFmontreal/Dcm2Bids", "3.2.0", "LICENSE.txt", "dcm2bids"),
+        ("UNFmontreal/Dcm2Bids", "3.3.1", "LICENSE.txt", "dcm2bids"),
         ("rordenlab/dcm2niix", "v1.0.20260724", "license.txt", "dcm2niix"),
     ):
         url = f"https://raw.githubusercontent.com/{repository}/{tag}/{filename}"

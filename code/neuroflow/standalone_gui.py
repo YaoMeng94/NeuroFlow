@@ -664,35 +664,16 @@ def _write_converter_smoke_dicom(path: Path, *, study_uid: str, series_uid: str,
     ds.save_as(path, enforce_file_format=True)
 
 
-def _windows_short_path(path: Path) -> Path:
-    """Return a fully qualified Windows 8.3 alias so CreateProcess sees no spaces."""
-    import ctypes
-
-    buffer = ctypes.create_unicode_buffer(32768)
-    get_short_path_name = ctypes.WinDLL("kernel32", use_last_error=True).GetShortPathNameW
-    get_short_path_name.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
-    get_short_path_name.restype = ctypes.c_uint
-    length = get_short_path_name(str(path), buffer, len(buffer))
-    if not length:
-        raise ctypes.WinError(ctypes.get_last_error())
-    short_path = Path(buffer.value)
-    if " " in str(short_path):
-        raise RuntimeError(
-            f"Windows did not provide a short path for the converter: {path}. "
-            "Install the app on a volume with 8.3 short names enabled."
-        )
-    return short_path
-
-
 def _converter_command(executable: Path, arguments: list[str]) -> list[str]:
-    """Use a no-space executable path while preserving normal argument quoting."""
-    argv0 = str(_windows_short_path(executable)) if sys.platform == "win32" else str(executable)
+    """Build a child command that preserves Windows executable identity."""
+    argv0 = executable.name if sys.platform == "win32" else str(executable)
     return [argv0, *arguments]
 
 
 def _converter_launch_kwargs(executable: Path) -> dict[str, str]:
-    # Keep CreateProcess's application-name path fully qualified but space-free.
-    return {"executable": str(_windows_short_path(executable))} if sys.platform == "win32" else {}
+    # Supply the full path separately to CreateProcess while keeping argv[0]
+    # free of spaces. dcm2bids 3.3.x includes the maintained Windows build.
+    return {"executable": str(executable)} if sys.platform == "win32" else {}
 
 
 def _prepare_external_process() -> None:
