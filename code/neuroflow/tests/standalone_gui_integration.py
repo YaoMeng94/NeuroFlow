@@ -83,6 +83,7 @@ class StandaloneGuiIntegrationTests(unittest.TestCase):
                     return __import__("subprocess").CompletedProcess(command, 0, "", "")
 
                 with patch("neuroflow.standalone_gui.shutil.which", return_value="dcm2bids"), \
+                     patch("neuroflow.standalone_gui._windows_short_path", side_effect=lambda path: path), \
                      patch("neuroflow.standalone_gui.subprocess.run", side_effect=run_converter), \
                      patch("neuroflow.standalone_gui.finalize_bids") as finalize, \
                      patch("neuroflow.standalone_gui.messagebox.askyesno", return_value=True), \
