@@ -13,6 +13,37 @@ from test_dicom_sort import write_dicom
 
 
 class StandaloneGuiIntegrationTests(unittest.TestCase):
+    def test_darkfluid_bids_mapping_is_removed_on_upgrade_with_backup(self) -> None:
+        from neuroflow.standalone_gui import _install_user_bids_config
+
+        with tempfile.TemporaryDirectory(prefix="neuroflow-config-migration-test-") as temp:
+            root = Path(temp)
+            settings = root / "settings"
+            settings.mkdir()
+            config_path = settings / "dcm2bids_config_prisma.json"
+            original = {
+                "search_method": "fnmatch",
+                "descriptions": [
+                    {
+                        "datatype": "anat", "suffix": "T1w",
+                        "criteria": {"SeriesDescription": "t1_tse_dark-fluid_tra"},
+                    },
+                    {
+                        "datatype": "anat", "suffix": "T2w",
+                        "criteria": {"SeriesDescription": "3dT2w_spc_sag_1mm"},
+                    },
+                ],
+            }
+            original_text = json.dumps(original, indent=2) + "\n"
+            config_path.write_text(original_text, encoding="utf-8")
+            with patch("neuroflow.standalone_gui._user_config_dir", return_value=settings):
+                self.assertEqual(_install_user_bids_config(), config_path)
+                migrated = json.loads(config_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(len(migrated["descriptions"]), 1)
+            self.assertEqual(migrated["descriptions"][0]["suffix"], "T2w")
+            self.assertEqual(config_path.with_suffix(".json.backup").read_text(encoding="utf-8"), original_text)
+
     def test_inprocess_dcm2bids_receives_arguments_without_executable_path(self) -> None:
         import sys
 

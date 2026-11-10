@@ -87,6 +87,36 @@ def _install_user_bids_config() -> Path:
     if not destination.exists():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(_bundled_preset().with_name(BIDS_CONFIG_NAME), destination)
+    else:
+        # Remove the old default T1-dark-fluid-as-T1w rule on upgrade while
+        # preserving the user's other edits. Keep a one-time backup first.
+        try:
+            config = json.loads(destination.read_text(encoding="utf-8"))
+            descriptions = config.get("descriptions", [])
+            filtered = [
+                description for description in descriptions
+                if not (
+                    description.get("datatype") == "anat"
+                    and description.get("suffix") == "T1w"
+                    and any(
+                        str(description.get("criteria", {}).get(key, "")).casefold()
+                        == "t1_tse_dark-fluid_tra"
+                        for key in ("SeriesDescription", "ProtocolName")
+                    )
+                )
+            ]
+            if len(filtered) != len(descriptions):
+                backup = destination.with_suffix(destination.suffix + ".backup")
+                if not backup.exists():
+                    shutil.copy2(destination, backup)
+                config["descriptions"] = filtered
+                temporary = destination.with_suffix(destination.suffix + ".tmp")
+                temporary.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+                temporary.replace(destination)
+        except (OSError, json.JSONDecodeError, AttributeError, TypeError):
+            # Leave malformed or unfamiliar user configs untouched; dcm2bids
+            # will report their validation error when conversion is requested.
+            pass
     return destination
 
 

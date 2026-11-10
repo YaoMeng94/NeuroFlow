@@ -76,15 +76,6 @@
       }
     },
     {
-      "datatype": "anat",
-      "suffix": "T1w",
-      "custom_entities": "acq-darkfluid",
-      "criteria": {
-        "SeriesDescription": "t1_tse_dark-fluid_tra",
-        "ProtocolName": "t1_tse_dark-fluid_tra"
-      }
-    },
-    {
       "datatype": "dwi",
       "suffix": "dwi",
       "custom_entities": "acq-dir98_dir-AP",
